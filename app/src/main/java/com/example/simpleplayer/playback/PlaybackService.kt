@@ -264,6 +264,12 @@ class PlaybackService : Service() {
         return START_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // NON fare nulla: il servizio continua a vivere in background.
+        // La musica suona anche se l'app viene chiusa dalle recenti.
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         mediaPlayer?.release()
         mediaPlayer = null
