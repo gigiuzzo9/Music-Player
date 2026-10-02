@@ -8,7 +8,6 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,7 +61,6 @@ fun FilesTab(service: PlaybackService) {
         )
     }
 
-    // Popup "tieni premuto"
     var contextFile by remember { mutableStateOf<AudioFile?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -94,7 +92,6 @@ fun FilesTab(service: PlaybackService) {
         return
     }
 
-    // Filtra: nasconde i file nella lista hidden
     val visibleFiles = allFiles.filter { it.id !in hiddenIds }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -124,7 +121,6 @@ fun FilesTab(service: PlaybackService) {
         }
     }
 
-    // ---------- Popup "tieni premuto" ----------
     contextFile?.let { file ->
         AlertDialog(
             onDismissRequest = { contextFile = null },
@@ -153,8 +149,7 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
         MediaStore.Audio.Media.ARTIST,
         MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
-            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
