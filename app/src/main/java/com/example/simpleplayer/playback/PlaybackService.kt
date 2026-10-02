@@ -215,18 +215,6 @@ class PlaybackService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
-        val nextIntent = PendingIntent.getService(
-            this, 3,
-            Intent(this, PlaybackService::class.java).setAction(ACTION_NEXT),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val prevIntent = PendingIntent.getService(
-            this, 4,
-            Intent(this, PlaybackService::class.java).setAction(ACTION_PREV),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
         val closeIntent = PendingIntent.getService(
             this, 2,
             Intent(this, PlaybackService::class.java).setAction(ACTION_CLOSE),
@@ -242,17 +230,10 @@ class PlaybackService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(currentTitle())
-            // NIENTE setContentText → la riga sotto il titolo sparisce
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
-            .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle()
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
-            .addAction(android.R.drawable.ic_media_previous, null, prevIntent)
             .addAction(playPauseIcon, null, playPauseIntent)
-            .addAction(android.R.drawable.ic_media_next, null, nextIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, null, closeIntent)
             .build()
     }
@@ -265,8 +246,6 @@ class PlaybackService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_TOGGLE -> togglePlayPause()
-            ACTION_NEXT -> next()
-            ACTION_PREV -> previous()
             ACTION_CLOSE -> {
                 stopAndClose()
                 return START_NOT_STICKY
