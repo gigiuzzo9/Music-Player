@@ -1,7 +1,11 @@
 package com.example.simpleplayer
 
 import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,12 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
+import com.example.simpleplayer.playback.PlaybackService
 import com.example.simpleplayer.ui.PlayerScreen
 import com.example.simpleplayer.ui.theme.SimplePlayerTheme
-import com.google.common.util.concurrent.ListenableFuture
-import com.google.common.util.concurrent.MoreExecutors
 
 class MainActivity : ComponentActivity() {
 
@@ -43,28 +44,29 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PlayerApp() {
     val context = LocalContext.current
-    var controller by remember { mutableStateOf<MediaController?>(null) }
+    var service by remember { mutableStateOf<PlaybackService?>(null) }
 
     DisposableEffect(Unit) {
-        val token = SessionToken(
-            context,
-            ComponentName(context, com.example.simpleplayer.playback.PlaybackService::class.java)
-        )
-        val future: ListenableFuture<MediaController> =
-            MediaController.Builder(context, token).buildAsync()
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                val localBinder = binder as PlaybackService.LocalBinder
+                service = localBinder.getService()
+            }
 
-        future.addListener(
-            { controller = future.get() },
-            MoreExecutors.directExecutor()
-        )
+            override fun onServiceDisconnected(name: ComponentName?) {
+                service = null
+            }
+        }
+
+        val intent = Intent(context, PlaybackService::class.java)
+        context.startService(intent)
+        context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
         onDispose {
-            controller?.release()
-            controller = null
-            MediaController.releaseFuture(future)
+            context.unbindService(connection)
         }
     }
 
-    val c = controller ?: return
-    PlayerScreen(controller = c)
+    val s = service ?: return
+    PlayerScreen(service = s)
 }
