@@ -2,6 +2,7 @@ package com.example.simpleplayer.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,17 @@ interface PlaylistDao {
 
     @Query("SELECT COUNT(*) FROM playlist_songs WHERE playlistId = :playlistId")
     suspend fun countSongs(playlistId: Long): Int
+
+    // --- File nascosti ---
+
+    @Query("SELECT mediaId FROM hidden_files")
+    fun observeHiddenIds(): Flow<List<Long>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun hideFile(file: HiddenFile)
+
+    @Query("DELETE FROM hidden_files WHERE mediaId = :mediaId")
+    suspend fun unhideFile(mediaId: Long)
 
     // --- Operazioni composte ---
 
