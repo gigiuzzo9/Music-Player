@@ -12,7 +12,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        // Imposta il nostro provider personalizzato
+        // Imposta il provider personalizzato
         setMediaNotificationProvider(CustomMediaNotificationProvider(this))
 
         val player = ExoPlayer.Builder(this).build()
