@@ -5,7 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Binder
 import android.os.Build
@@ -21,6 +25,27 @@ class PlaybackService : Service() {
     private var queue: List<Pair<String, String>> = emptyList()
     private var currentIndex = 0
 
+    private lateinit var audioManager: AudioManager
+    private var focusRequest: AudioFocusRequest? = null
+
+    private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                mediaPlayer?.let {
+                    if (it.isPlaying) it.pause()
+                    updateNotification()
+                }
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                mediaPlayer?.let {
+                    it.start()
+                    updateNotification()
+                }
+            }
+        }
+    }
+
     inner class LocalBinder : Binder() {
         fun getService(): PlaybackService = this@PlaybackService
     }
@@ -30,12 +55,15 @@ class PlaybackService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
 
     fun playQueue(items: List<Pair<String, String>>, startIndex: Int) {
         queue = items
         currentIndex = startIndex
-        playCurrent()
+        if (requestAudioFocus()) {
+            playCurrent()
+        }
     }
 
     fun togglePlayPause() {
@@ -43,7 +71,9 @@ class PlaybackService : Service() {
         if (mp.isPlaying) {
             mp.pause()
         } else {
-            mp.start()
+            if (requestAudioFocus()) {
+                mp.start()
+            }
         }
         updateNotification()
     }
@@ -72,6 +102,12 @@ class PlaybackService : Service() {
 
         mediaPlayer?.release()
         mediaPlayer = MediaPlayer().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
             setDataSource(this@PlaybackService, android.net.Uri.parse(item.first))
             setOnPreparedListener {
                 it.start()
@@ -85,9 +121,44 @@ class PlaybackService : Service() {
         }
     }
 
+    private fun requestAudioFocus(): Boolean {
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (focusRequest == null) {
+                focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    .setOnAudioFocusChangeListener(focusChangeListener)
+                    .build()
+            }
+            audioManager.requestAudioFocus(focusRequest!!)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                focusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(focusChangeListener)
+        }
+    }
+
     private fun stopAndClose() {
         mediaPlayer?.release()
         mediaPlayer = null
+        abandonAudioFocus()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -124,7 +195,7 @@ class PlaybackService : Service() {
         )
 
         val isPlaying = mediaPlayer?.isPlaying == true
-        val icon = if (isPlaying)
+        val playPauseIcon = if (isPlaying)
             android.R.drawable.ic_media_pause
         else
             android.R.drawable.ic_media_play
@@ -136,8 +207,8 @@ class PlaybackService : Service() {
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
-            .addAction(icon, "Play/Pausa", playPauseIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Chiudi", closeIntent)
+            .addAction(playPauseIcon, null, playPauseIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, null, closeIntent)
             .build()
     }
 
@@ -146,7 +217,7 @@ class PlaybackService : Service() {
         manager.notify(NOTIFICATION_ID, buildNotification())
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startIndex: Int): Int {
         when (intent?.action) {
             ACTION_TOGGLE -> togglePlayPause()
             ACTION_CLOSE -> {
@@ -163,6 +234,7 @@ class PlaybackService : Service() {
     override fun onDestroy() {
         mediaPlayer?.release()
         mediaPlayer = null
+        abandonAudioFocus()
         super.onDestroy()
     }
 
