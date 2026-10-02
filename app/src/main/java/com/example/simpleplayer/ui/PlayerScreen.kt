@@ -15,15 +15,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.media3.session.MediaController
 
 @Composable
-fun PlayerScreen() {
+fun PlayerScreen(controller: MediaController) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Tutti i file", "Playlist")
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- Tab in alto ---
         TabRow(selectedTabIndex = selectedTab) {
             tabs.forEachIndexed { index, title ->
                 Tab(
@@ -34,26 +34,24 @@ fun PlayerScreen() {
             }
         }
 
-        // --- Contenuto centrale: cambia in base al tab ---
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
             when (selectedTab) {
-                0 -> FilesTab()
-                1 -> PlaylistTab()
+                0 -> FilesTab(controller = controller)
+                1 -> PlaylistTab(controller = controller)
             }
         }
 
-        // --- Barra comandi player in basso (~20-25%) ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.28f)
                 .padding(horizontal = 8.dp)
         ) {
-            PlayerBar()
+            PlayerBar(controller = controller)
         }
     }
 }
