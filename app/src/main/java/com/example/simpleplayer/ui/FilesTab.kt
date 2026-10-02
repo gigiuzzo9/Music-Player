@@ -26,10 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.session.MediaController
 import com.example.simpleplayer.model.AudioFile
 
 @Composable
-fun FilesTab() {
+fun FilesTab(controller: MediaController) {
     val context = LocalContext.current
     var files by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var hasPermission by remember {
@@ -79,7 +82,23 @@ fun FilesTab() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        // Qui in futuro: fai partire la riproduzione
+                        // Imposta l'intera lista come coda e parte dal brano toccato
+                        val items = files.map { f ->
+                            MediaItem.Builder()
+                                .setUri(f.uri)
+                                .setMediaId(f.id.toString())
+                                .setMediaMetadata(
+                                    MediaMetadata.Builder()
+                                        .setTitle(f.title)
+                                        .setArtist(f.artist)
+                                        .build()
+                                )
+                                .build()
+                        }
+                        val startIndex = files.indexOf(file).coerceAtLeast(0)
+                        controller.setMediaItems(items, startIndex, 0L)
+                        controller.prepare()
+                        controller.play()
                     }
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
