@@ -72,6 +72,9 @@ fun PlaylistTab(service: PlaybackService) {
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var addingToPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
+    // FLAG esplicito: stiamo creando nuova playlist o aggiungendo a esistente?
+    var mode by remember { mutableStateOf("") } // "create" | "add" | ""
+
     var openedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var openedSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
 
@@ -88,9 +91,17 @@ fun PlaylistTab(service: PlaybackService) {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
+
+    // Dopo che il permesso è concesso, apri il popup file (se eravamo in attesa)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted -> hasPermission = granted }
+    ) { granted ->
+        hasPermission = granted
+        if (granted && mode.isNotEmpty()) {
+            allFiles = queryAudioFiles(context)
+            showFileDialog = true
+        }
+    }
 
     LaunchedEffect(showFileDialog) {
         if (showFileDialog && hasPermission) {
@@ -127,6 +138,7 @@ fun PlaylistTab(service: PlaybackService) {
                     newName = ""
                     renamingPlaylist = null
                     addingToPlaylist = null
+                    mode = ""
                     showNameDialog = true
                 },
                 modifier = Modifier
@@ -165,6 +177,7 @@ fun PlaylistTab(service: PlaybackService) {
                         actionsPlaylist = null
                         selectedIds = emptySet()
                         addingToPlaylist = playlist
+                        mode = "add"
                         if (hasPermission) {
                             allFiles = queryAudioFiles(context)
                             showFileDialog = true
@@ -276,8 +289,10 @@ fun PlaylistTab(service: PlaybackService) {
                         if (renaming != null) {
                             scope.launch { dao.renamePlaylist(renaming.id, newName) }
                         } else {
+                            // Nuova playlist
                             selectedIds = emptySet()
                             addingToPlaylist = null
+                            mode = "create"
                             if (hasPermission) {
                                 allFiles = queryAudioFiles(context)
                                 showFileDialog = true
@@ -305,11 +320,12 @@ fun PlaylistTab(service: PlaybackService) {
             onDismissRequest = {
                 showFileDialog = false
                 addingToPlaylist = null
+                mode = ""
             },
             title = {
                 Text(
-                    if (addingToPlaylist == null) "Scegli i brani"
-                    else "Aggiungi a ${addingToPlaylist?.name}"
+                    if (mode == "add") "Aggiungi a ${addingToPlaylist?.name}"
+                    else "Scegli i brani"
                 )
             },
             text = {
@@ -365,22 +381,30 @@ fun PlaylistTab(service: PlaybackService) {
                                 position = 0
                             )
                         }
+
+                    val currentMode = mode
+                    val adding = addingToPlaylist
+
                     scope.launch {
-                        val adding = addingToPlaylist
-                        if (adding != null) {
+                        if (currentMode == "add" && adding != null) {
+                            // AGGIUNGI alla playlist esistente
                             dao.addSongsToPlaylist(adding.id, chosen)
                         } else {
+                            // CREA nuova playlist
                             dao.createPlaylistWithSongs(newName, chosen)
                         }
                     }
+
                     showFileDialog = false
                     addingToPlaylist = null
+                    mode = ""
                 }) { Text("Fatto") }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showFileDialog = false
                     addingToPlaylist = null
+                    mode = ""
                 }) { Text("Annulla") }
             }
         )
