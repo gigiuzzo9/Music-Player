@@ -21,8 +21,6 @@ class PlaybackService : Service() {
     private var queue: List<Pair<String, String>> = emptyList()
     private var currentIndex = 0
 
-    private var isPlaying = false
-
     inner class LocalBinder : Binder() {
         fun getService(): PlaybackService = this@PlaybackService
     }
@@ -44,10 +42,8 @@ class PlaybackService : Service() {
         val mp = mediaPlayer ?: return
         if (mp.isPlaying) {
             mp.pause()
-            isPlaying = false
         } else {
             mp.start()
-            isPlaying = true
         }
         updateNotification()
     }
@@ -66,7 +62,7 @@ class PlaybackService : Service() {
         }
     }
 
-    fun isPlayingNow(): Boolean = isPlaying
+    fun isPlayingNow(): Boolean = mediaPlayer?.isPlaying == true
 
     fun currentTitle(): String =
         queue.getOrNull(currentIndex)?.second ?: "Nessun brano"
@@ -79,7 +75,6 @@ class PlaybackService : Service() {
             setDataSource(this@PlaybackService, android.net.Uri.parse(item.first))
             setOnPreparedListener {
                 it.start()
-                isPlaying = true
                 updateNotification()
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
@@ -93,7 +88,6 @@ class PlaybackService : Service() {
     private fun stopAndClose() {
         mediaPlayer?.release()
         mediaPlayer = null
-        isPlaying = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -129,6 +123,7 @@ class PlaybackService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
+        val isPlaying = mediaPlayer?.isPlaying == true
         val icon = if (isPlaying)
             android.R.drawable.ic_media_pause
         else
