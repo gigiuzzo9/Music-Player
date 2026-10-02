@@ -4,15 +4,17 @@ import android.content.ComponentName
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.simpleplayer.ui.PlayerScreen
@@ -27,7 +29,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SimplePlayerTheme {
-                PlayerApp()
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    PlayerApp()
+                }
             }
         }
     }
@@ -38,7 +45,6 @@ fun PlayerApp() {
     val context = LocalContext.current
     var controller by remember { mutableStateOf<MediaController?>(null) }
 
-    // Connessione al PlaybackService tramite MediaController
     DisposableEffect(Unit) {
         val token = SessionToken(
             context,
@@ -59,11 +65,6 @@ fun PlayerApp() {
         }
     }
 
-    val c = controller
-    if (c == null) {
-        // Ancora in connessione col service
-        return
-    }
-
+    val c = controller ?: return
     PlayerScreen(controller = c)
 }
