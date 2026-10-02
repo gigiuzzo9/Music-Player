@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,18 +27,45 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-
-// Modalità di ripetizione
-enum class RepeatMode { OFF, ALL, ONE }
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
 
 @Composable
-fun PlayerBar() {
+fun PlayerBar(controller: MediaController) {
 
-    // Stato finto — poi lo collegheremo al MediaController
-    var isPlaying by remember { mutableStateOf(false) }
-    var repeatMode by remember { mutableStateOf(RepeatMode.OFF) }
-    var currentTitle by remember { mutableStateOf("Nessun brano") }
-    var currentArtist by remember { mutableStateOf("") }
+    // Stato osservato dal player
+    var isPlaying by remember { mutableStateOf(controller.isPlaying) }
+    var repeatMode by remember { mutableIntStateOf(controller.repeatMode) }
+    var title by remember { mutableStateOf("Nessun brano") }
+    var artist by remember { mutableStateOf("") }
+
+    // Listener per aggiornare la UI quando cambia lo stato del player
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+
+            override fun onRepeatModeChanged(mode: Int) {
+                repeatMode = mode
+            }
+
+            override fun onMediaMetadataChanged(metadata: MediaMetadata) {
+                title = metadata.title?.toString() ?: "Sconosciuto"
+                artist = metadata.artist?.toString() ?: ""
+            }
+
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                val md = mediaItem?.mediaMetadata
+                title = md?.title?.toString() ?: "Sconosciuto"
+                artist = md?.artist?.toString() ?: ""
+            }
+        }
+        controller.addListener(listener)
+        onDispose { controller.removeListener(listener) }
+    }
 
     Column(
         modifier = Modifier
@@ -48,13 +76,13 @@ fun PlayerBar() {
 
         // --- Titolo e artista ---
         Text(
-            currentTitle,
+            title,
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            currentArtist,
+            artist,
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -71,15 +99,16 @@ fun PlayerBar() {
 
             // Indietro
             IconButton(onClick = {
-                // TODO: collegare a controller.seekToPrevious()
+                if (controller.hasPreviousMediaItem()) {
+                    controller.seekToPreviousMediaItem()
+                }
             }) {
                 Icon(Icons.Filled.SkipPrevious, contentDescription = "Indietro")
             }
 
             // Play / Pausa
             IconButton(onClick = {
-                isPlaying = !isPlaying
-                // TODO: collegare a controller.play() / controller.pause()
+                if (controller.isPlaying) controller.pause() else controller.play()
             }) {
                 Icon(
                     if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -89,25 +118,27 @@ fun PlayerBar() {
 
             // Avanti
             IconButton(onClick = {
-                // TODO: collegare a controller.seekToNext()
+                if (controller.hasNextMediaItem()) {
+                    controller.seekToNextMediaItem()
+                }
             }) {
                 Icon(Icons.Filled.SkipNext, contentDescription = "Avanti")
             }
 
             // Repeat: cicla OFF → ALL → ONE → OFF
             IconButton(onClick = {
-                repeatMode = when (repeatMode) {
-                    RepeatMode.OFF -> RepeatMode.ALL
-                    RepeatMode.ALL -> RepeatMode.ONE
-                    RepeatMode.ONE -> RepeatMode.OFF
+                val next = when (controller.repeatMode) {
+                    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                    else -> Player.REPEAT_MODE_OFF
                 }
-                // TODO: collegare a controller.setRepeatMode(...)
+                controller.repeatMode = next
             }) {
                 Icon(
-                    if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
+                    if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne
                     else Icons.Filled.Repeat,
                     contentDescription = "Ripeti",
-                    tint = if (repeatMode == RepeatMode.OFF)
+                    tint = if (repeatMode == Player.REPEAT_MODE_OFF)
                         MaterialTheme.colorScheme.onSurface
                     else
                         MaterialTheme.colorScheme.primary
