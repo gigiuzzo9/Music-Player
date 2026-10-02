@@ -100,8 +100,13 @@ class PlaybackService : Service() {
     fun currentTitle(): String =
         queue.getOrNull(currentIndex)?.second ?: "Nessun brano"
 
-    fun getPosition(): Long = try { mediaPlayer?.currentPosition?.toLong() ?: 0L } catch (e: Exception) { 0L }
-    fun getDuration(): Long = try { mediaPlayer?.duration?.toLong() ?: 0L } catch (e: Exception) { 0L }
+    fun getPosition(): Long = try {
+        mediaPlayer?.currentPosition?.toLong() ?: 0L
+    } catch (e: Exception) { 0L }
+
+    fun getDuration(): Long = try {
+        mediaPlayer?.duration?.toLong() ?: 0L
+    } catch (e: Exception) { 0L }
 
     fun seekTo(ms: Long) {
         mediaPlayer?.seekTo(ms.toInt())
@@ -210,6 +215,18 @@ class PlaybackService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
+        val nextIntent = PendingIntent.getService(
+            this, 3,
+            Intent(this, PlaybackService::class.java).setAction(ACTION_NEXT),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val prevIntent = PendingIntent.getService(
+            this, 4,
+            Intent(this, PlaybackService::class.java).setAction(ACTION_PREV),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
         val closeIntent = PendingIntent.getService(
             this, 2,
             Intent(this, PlaybackService::class.java).setAction(ACTION_CLOSE),
@@ -229,7 +246,9 @@ class PlaybackService : Service() {
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
+            .addAction(android.R.drawable.ic_media_previous, null, prevIntent)
             .addAction(playPauseIcon, null, playPauseIntent)
+            .addAction(android.R.drawable.ic_media_next, null, nextIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, null, closeIntent)
             .build()
     }
@@ -242,6 +261,8 @@ class PlaybackService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_TOGGLE -> togglePlayPause()
+            ACTION_NEXT -> next()
+            ACTION_PREV -> previous()
             ACTION_CLOSE -> {
                 stopAndClose()
                 return START_NOT_STICKY
@@ -264,6 +285,8 @@ class PlaybackService : Service() {
         const val CHANNEL_ID = "music_player_channel"
         const val NOTIFICATION_ID = 1001
         const val ACTION_TOGGLE = "com.example.simpleplayer.TOGGLE"
+        const val ACTION_NEXT = "com.example.simpleplayer.NEXT"
+        const val ACTION_PREV = "com.example.simpleplayer.PREV"
         const val ACTION_CLOSE = "com.example.simpleplayer.CLOSE"
     }
 }
