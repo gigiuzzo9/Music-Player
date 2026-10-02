@@ -26,8 +26,8 @@ jobs:
 
       - name: Bootstrap Gradle Wrapper
         run: |
-          if [ ! -f ./gradlew ]; then
-            gradle wrapper --gradle-version 8.7
+          if [ ! -f ./gradlew ] || ! grep -q "8.9" gradle/wrapper/gradle-wrapper.properties 2>/dev/null; then
+            gradle wrapper --gradle-version 8.9
           fi
           chmod +x ./gradlew
 
