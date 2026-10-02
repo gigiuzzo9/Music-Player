@@ -20,6 +20,9 @@ interface PlaylistDao {
     @Query("DELETE FROM playlists WHERE id = :playlistId")
     suspend fun deletePlaylist(playlistId: Long)
 
+    @Query("UPDATE playlists SET name = :newName WHERE id = :playlistId")
+    suspend fun renamePlaylist(playlistId: Long, newName: String)
+
     // --- Brani di una playlist ---
 
     @Query("SELECT * FROM playlist_songs WHERE playlistId = :playlistId ORDER BY position ASC")
@@ -34,6 +37,9 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId AND mediaId = :mediaId")
     suspend fun removeSong(playlistId: Long, mediaId: Long)
 
+    @Query("SELECT COUNT(*) FROM playlist_songs WHERE playlistId = :playlistId")
+    suspend fun countSongs(playlistId: Long): Int
+
     // --- Operazioni composte ---
 
     @Transaction
@@ -41,6 +47,15 @@ interface PlaylistDao {
         val playlistId = insertPlaylist(Playlist(name = name))
         val fixed = songs.mapIndexed { index, song ->
             song.copy(playlistId = playlistId, position = index)
+        }
+        insertSongs(fixed)
+    }
+
+    @Transaction
+    suspend fun addSongsToPlaylist(playlistId: Long, songs: List<PlaylistSong>) {
+        val startPos = countSongs(playlistId)
+        val fixed = songs.mapIndexed { index, song ->
+            song.copy(playlistId = playlistId, position = startPos + index)
         }
         insertSongs(fixed)
     }
