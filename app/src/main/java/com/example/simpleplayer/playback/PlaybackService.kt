@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Binder
@@ -13,18 +12,16 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.simpleplayer.MainActivity
-import com.example.simpleplayer.R
 
 class PlaybackService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private val binder = LocalBinder()
 
-    // Coda di brani
-    private var queue: List<Pair<String, String>> = emptyList() // (uri, titolo)
+    // Coda di brani: (uri, titolo)
+    private var queue: List<Pair<String, String>> = emptyList()
     private var currentIndex = 0
 
-    // Stato
     private var isPlaying = false
 
     inner class LocalBinder : Binder() {
@@ -89,6 +86,7 @@ class PlaybackService : Service() {
                 it.start()
                 isPlaying = true
                 updateNotification()
+                startForeground(NOTIFICATION_ID, buildNotification())
             }
             setOnCompletionListener {
                 next()
@@ -168,7 +166,6 @@ class PlaybackService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                // Avvia il foreground con la notifica
                 startForeground(NOTIFICATION_ID, buildNotification())
             }
         }
