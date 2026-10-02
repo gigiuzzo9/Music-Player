@@ -232,7 +232,6 @@ class PlaybackService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(currentTitle())
-            .setContentText("Music Player")
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
