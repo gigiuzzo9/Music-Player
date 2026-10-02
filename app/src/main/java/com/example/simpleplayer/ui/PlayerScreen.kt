@@ -19,7 +19,7 @@ import com.example.simpleplayer.playback.PlaybackService
 @Composable
 fun PlayerScreen(service: PlaybackService) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Tutti i file", "Playlist")
+    val tabs = listOf("Tutti i file", "Playlist", "Nascosti")
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -41,6 +41,7 @@ fun PlayerScreen(service: PlaybackService) {
             when (selectedTab) {
                 0 -> FilesTab(service = service)
                 1 -> PlaylistTab(service = service)
+                2 -> HiddenTab()
             }
         }
 
