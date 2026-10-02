@@ -17,6 +17,8 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.simpleplayer.MainActivity
 
+enum class RepeatMode { OFF, ALL, ONE }
+
 class PlaybackService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
@@ -24,6 +26,8 @@ class PlaybackService : Service() {
 
     private var queue: List<Pair<String, String>> = emptyList()
     private var currentIndex = 0
+
+    private var repeatMode = RepeatMode.OFF
 
     private lateinit var audioManager: AudioManager
     private var focusRequest: AudioFocusRequest? = null
@@ -61,9 +65,7 @@ class PlaybackService : Service() {
     fun playQueue(items: List<Pair<String, String>>, startIndex: Int) {
         queue = items
         currentIndex = startIndex
-        if (requestAudioFocus()) {
-            playCurrent()
-        }
+        if (requestAudioFocus()) playCurrent()
     }
 
     fun togglePlayPause() {
@@ -71,9 +73,7 @@ class PlaybackService : Service() {
         if (mp.isPlaying) {
             mp.pause()
         } else {
-            if (requestAudioFocus()) {
-                mp.start()
-            }
+            if (requestAudioFocus()) mp.start()
         }
         updateNotification()
     }
@@ -81,6 +81,9 @@ class PlaybackService : Service() {
     fun next() {
         if (currentIndex < queue.size - 1) {
             currentIndex++
+            playCurrent()
+        } else if (repeatMode == RepeatMode.ALL) {
+            currentIndex = 0
             playCurrent()
         }
     }
@@ -97,6 +100,24 @@ class PlaybackService : Service() {
     fun currentTitle(): String =
         queue.getOrNull(currentIndex)?.second ?: "Nessun brano"
 
+    fun getPosition(): Long = try { mediaPlayer?.currentPosition?.toLong() ?: 0L } catch (e: Exception) { 0L }
+    fun getDuration(): Long = try { mediaPlayer?.duration?.toLong() ?: 0L } catch (e: Exception) { 0L }
+
+    fun seekTo(ms: Long) {
+        mediaPlayer?.seekTo(ms.toInt())
+    }
+
+    fun getRepeatMode(): RepeatMode = repeatMode
+
+    fun cycleRepeatMode() {
+        repeatMode = when (repeatMode) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+        mediaPlayer?.isLooping = (repeatMode == RepeatMode.ONE)
+    }
+
     private fun playCurrent() {
         val item = queue.getOrNull(currentIndex) ?: return
 
@@ -108,6 +129,7 @@ class PlaybackService : Service() {
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
             )
+            isLooping = (repeatMode == RepeatMode.ONE)
             setDataSource(this@PlaybackService, android.net.Uri.parse(item.first))
             setOnPreparedListener {
                 it.start()
@@ -217,7 +239,7 @@ class PlaybackService : Service() {
         manager.notify(NOTIFICATION_ID, buildNotification())
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startIndex: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_TOGGLE -> togglePlayPause()
             ACTION_CLOSE -> {
