@@ -242,10 +242,14 @@ class PlaybackService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(currentTitle())
-            .setContentText("Music Player")
+            // NIENTE setContentText → la riga sotto il titolo sparisce
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setShowActionsInCompactView(0, 1, 2)
+            )
             .addAction(android.R.drawable.ic_media_previous, null, prevIntent)
             .addAction(playPauseIcon, null, playPauseIntent)
             .addAction(android.R.drawable.ic_media_next, null, nextIntent)
