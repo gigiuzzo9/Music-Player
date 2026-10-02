@@ -12,6 +12,9 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
+        // Imposta il nostro provider personalizzato
+        setMediaNotificationProvider(CustomMediaNotificationProvider(this))
+
         val player = ExoPlayer.Builder(this).build()
         mediaSession = MediaSession.Builder(this, player).build()
     }
@@ -21,16 +24,10 @@ class PlaybackService : MediaSessionService() {
     ): MediaSession? = mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Rilascia TUTTO: session + player.
-        // Senza questo, il processo resta vivo anche in riproduzione.
-        mediaSession?.run {
-            player.stop()
-            player.clearMediaItems()
-            player.release()
-            release()
-        }
-        mediaSession = null
-
+        // Swipe via l'app dalle recenti → chiudi tutto
+        val player = mediaSession?.player
+        player?.stop()
+        player?.clearMediaItems()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         super.onTaskRemoved(rootIntent)
