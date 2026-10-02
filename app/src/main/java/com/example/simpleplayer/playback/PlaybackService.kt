@@ -1,6 +1,5 @@
 package com.example.simpleplayer.playback
 
-import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -20,12 +19,12 @@ class PlaybackService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, exo).build()
 
-        // Quando va in pausa, fermiamo il foreground service
-        // così la notifica sparisce
         exo.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (!isPlaying && exo.playbackState == Player.STATE_READY) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
+                if (!isPlaying) {
+                    // In pausa: demota il servizio a background.
+                    // Così la notifica diventa swipeabile e non è più "appuntata".
+                    stopForeground(STOP_FOREGROUND_DETACH)
                 }
             }
         })
@@ -35,6 +34,16 @@ class PlaybackService : MediaSessionService() {
         controllerInfo: MediaSession.ControllerInfo
     ): MediaSession? = mediaSession
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Swipe via l'app dalle recenti → chiudi tutto
+        val p = mediaSession?.player
+        p?.stop()
+        p?.clearMediaItems()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         mediaSession?.run {
             player.release()
@@ -43,12 +52,5 @@ class PlaybackService : MediaSessionService() {
         mediaSession = null
         player = null
         super.onDestroy()
-    }
-
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        val p = mediaSession?.player
-        if (p == null || !p.playWhenReady || p.mediaItemCount == 0) {
-            stopSelf()
-        }
     }
 }
