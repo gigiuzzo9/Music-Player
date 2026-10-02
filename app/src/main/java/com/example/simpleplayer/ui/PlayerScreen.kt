@@ -9,13 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,7 +32,6 @@ fun PlayerScreen(service: PlaybackService) {
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- Barra tab personalizzata ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -56,7 +56,6 @@ fun PlayerScreen(service: PlaybackService) {
                 Text("Playlist")
             }
 
-            // Tab Nascosti: 12% della larghezza
             TabItem(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
@@ -105,8 +104,8 @@ private fun TabItem(
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.material3.LocalContentColor provides
+        CompositionLocalProvider(
+            LocalContentColor provides
                     if (selected) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
         ) {
