@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,13 +27,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.session.MediaController
 import com.example.simpleplayer.model.AudioFile
+import com.example.simpleplayer.playback.PlaybackService
 
 @Composable
-fun FilesTab(controller: MediaController) {
+fun FilesTab(service: PlaybackService) {
     val context = LocalContext.current
     var files by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var hasPermission by remember {
@@ -82,30 +81,17 @@ fun FilesTab(controller: MediaController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        // Imposta l'intera lista come coda e parte dal brano toccato
-                        val items = files.map { f ->
-                            MediaItem.Builder()
-                                .setUri(f.uri)
-                                .setMediaId(f.id.toString())
-                                .setMediaMetadata(
-                                    MediaMetadata.Builder()
-                                        .setTitle(f.title)
-                                        .setArtist(f.artist)
-                                        .build()
-                                )
-                                .build()
-                        }
-                        val startIndex = files.indexOf(file).coerceAtLeast(0)
-                        controller.setMediaItems(items, startIndex, 0L)
-                        controller.prepare()
-                        controller.play()
+                        // Manda la lista al service e parti dal brano toccato
+                        val queue = files.map { it.uri.toString() to it.title }
+                        val index = files.indexOf(file).coerceAtLeast(0)
+                        service.playQueue(queue, index)
                     }
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(file.title)
                 Text(
                     file.artist,
-                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
             HorizontalDivider()
