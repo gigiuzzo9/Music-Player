@@ -7,33 +7,49 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.simpleplayer.SimplePlayerApp
+import com.example.simpleplayer.data.HiddenFile
 import com.example.simpleplayer.model.AudioFile
 import com.example.simpleplayer.playback.PlaybackService
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FilesTab(service: PlaybackService) {
     val context = LocalContext.current
-    var files by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
+    val app = context.applicationContext as SimplePlayerApp
+    val dao = app.database.playlistDao()
+    val scope = rememberCoroutineScope()
+
+    var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
+    val hiddenIds by dao.observeHiddenIds().collectAsState(initial = emptyList())
+
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -45,6 +61,9 @@ fun FilesTab(service: PlaybackService) {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
+
+    // Popup "tieni premuto"
+    var contextFile by remember { mutableStateOf<AudioFile?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -63,7 +82,7 @@ fun FilesTab(service: PlaybackService) {
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            files = queryAudioFiles(context)
+            allFiles = queryAudioFiles(context)
         }
     }
 
@@ -75,17 +94,24 @@ fun FilesTab(service: PlaybackService) {
         return
     }
 
+    // Filtra: nasconde i file nella lista hidden
+    val visibleFiles = allFiles.filter { it.id !in hiddenIds }
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(files, key = { it.id }) { file ->
+        items(visibleFiles, key = { it.id }) { file ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        // Manda la lista al service e parti dal brano toccato
-                        val queue = files.map { it.uri.toString() to it.title }
-                        val index = files.indexOf(file).coerceAtLeast(0)
-                        service.playQueue(queue, index)
-                    }
+                    .combinedClickable(
+                        onClick = {
+                            val queue = visibleFiles.map { it.uri.toString() to it.title }
+                            val index = visibleFiles.indexOf(file).coerceAtLeast(0)
+                            service.playQueue(queue, index)
+                        },
+                        onLongClick = {
+                            contextFile = file
+                        }
+                    )
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(file.title)
@@ -97,6 +123,26 @@ fun FilesTab(service: PlaybackService) {
             HorizontalDivider()
         }
     }
+
+    // ---------- Popup "tieni premuto" ----------
+    contextFile?.let { file ->
+        AlertDialog(
+            onDismissRequest = { contextFile = null },
+            title = { Text(file.title) },
+            text = { Text("Vuoi nascondere questo file?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        dao.hideFile(HiddenFile(file.id))
+                    }
+                    contextFile = null
+                }) { Text("Nascondi") }
+            },
+            dismissButton = {
+                TextButton(onClick = { contextFile = null }) { Text("Annulla") }
+            }
+        )
+    }
 }
 
 private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
@@ -107,7 +153,8 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
         MediaStore.Audio.Media.ARTIST,
         MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
+            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
