@@ -62,6 +62,7 @@ fun PlaylistTab(service: PlaybackService) {
     val scope = rememberCoroutineScope()
 
     val playlists by dao.observePlaylists().collectAsState(initial = emptyList())
+    val hiddenIds by dao.observeHiddenIds().collectAsState(initial = emptyList())
 
     var showNameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
@@ -71,9 +72,7 @@ fun PlaylistTab(service: PlaybackService) {
     var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var addingToPlaylist by remember { mutableStateOf<Playlist?>(null) }
-
-    // FLAG esplicito: stiamo creando nuova playlist o aggiungendo a esistente?
-    var mode by remember { mutableStateOf("") } // "create" | "add" | ""
+    var mode by remember { mutableStateOf("") }
 
     var openedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var openedSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
@@ -92,7 +91,6 @@ fun PlaylistTab(service: PlaybackService) {
         )
     }
 
-    // Dopo che il permesso è concesso, apri il popup file (se eravamo in attesa)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -289,7 +287,6 @@ fun PlaylistTab(service: PlaybackService) {
                         if (renaming != null) {
                             scope.launch { dao.renamePlaylist(renaming.id, newName) }
                         } else {
-                            // Nuova playlist
                             selectedIds = emptySet()
                             addingToPlaylist = null
                             mode = "create"
@@ -316,6 +313,9 @@ fun PlaylistTab(service: PlaybackService) {
 
     // ---------- Popup selezione file ----------
     if (showFileDialog) {
+        // Filtra i file nascosti anche nel popup di scelta
+        val visibleFiles = allFiles.filter { it.id !in hiddenIds }
+
         AlertDialog(
             onDismissRequest = {
                 showFileDialog = false
@@ -335,10 +335,10 @@ fun PlaylistTab(service: PlaybackService) {
                         .height(400.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    if (allFiles.isEmpty()) {
+                    if (visibleFiles.isEmpty()) {
                         Text("Nessun file disponibile")
                     } else {
-                        allFiles.forEach { file ->
+                        visibleFiles.forEach { file ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -387,10 +387,8 @@ fun PlaylistTab(service: PlaybackService) {
 
                     scope.launch {
                         if (currentMode == "add" && adding != null) {
-                            // AGGIUNGI alla playlist esistente
                             dao.addSongsToPlaylist(adding.id, chosen)
                         } else {
-                            // CREA nuova playlist
                             dao.createPlaylistWithSongs(newName, chosen)
                         }
                     }
@@ -419,7 +417,8 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         MediaStore.Audio.Media.ARTIST,
         MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
+            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
