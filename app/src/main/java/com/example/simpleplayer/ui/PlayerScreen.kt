@@ -14,10 +14,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.media3.session.MediaController
+import com.example.simpleplayer.playback.PlaybackService
 
 @Composable
-fun PlayerScreen(controller: MediaController) {
+fun PlayerScreen(service: PlaybackService) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Tutti i file", "Playlist")
 
@@ -39,8 +39,8 @@ fun PlayerScreen(controller: MediaController) {
                 .fillMaxWidth()
         ) {
             when (selectedTab) {
-                0 -> FilesTab(controller = controller)
-                1 -> PlaylistTab(controller = controller)
+                0 -> FilesTab(service = service)
+                1 -> PlaylistTab(service = service)
             }
         }
 
@@ -50,7 +50,7 @@ fun PlayerScreen(controller: MediaController) {
                 .weight(0.28f)
                 .padding(horizontal = 8.dp)
         ) {
-            PlayerBar(controller = controller)
+            PlayerBar(service = service)
         }
     }
 }
