@@ -21,10 +21,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +50,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
+import com.example.simpleplayer.data.Playlist
 import com.example.simpleplayer.data.PlaylistSong
 import com.example.simpleplayer.model.AudioFile
 import kotlinx.coroutines.launch
@@ -59,13 +65,25 @@ fun PlaylistTab(controller: MediaController) {
 
     val playlists by dao.observePlaylists().collectAsState(initial = emptyList())
 
+    // Popup nome (nuova / rinomina)
     var showNameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
+    var renamingPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
+    // Popup selezione file (nuova playlist O aggiunta a esistente)
     var showFileDialog by remember { mutableStateOf(false) }
     var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var addingToPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
+    // Popup dettaglio playlist
+    var openedPlaylist by remember { mutableStateOf<Playlist?>(null) }
+    var openedSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
+
+    // Popup azioni
+    var actionsPlaylist by remember { mutableStateOf<Playlist?>(null) }
+
+    // Permesso
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -77,7 +95,6 @@ fun PlaylistTab(controller: MediaController) {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasPermission = granted }
@@ -85,6 +102,13 @@ fun PlaylistTab(controller: MediaController) {
     LaunchedEffect(showFileDialog) {
         if (showFileDialog && hasPermission) {
             allFiles = queryAudioFiles(context)
+        }
+    }
+
+    LaunchedEffect(openedPlaylist) {
+        val pl = openedPlaylist
+        if (pl != null) {
+            dao.observeSongs(pl.id).collect { openedSongs = it }
         }
     }
 
@@ -96,28 +120,7 @@ fun PlaylistTab(controller: MediaController) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                scope.launch {
-                                    val songs = dao.getSongs(playlist.id)
-                                    if (songs.isNotEmpty()) {
-                                        val items = songs.map { s ->
-                                            MediaItem.Builder()
-                                                .setUri(s.uri)
-                                                .setMediaId(s.mediaId.toString())
-                                                .setMediaMetadata(
-                                                    MediaMetadata.Builder()
-                                                        .setTitle(s.title)
-                                                        .setArtist(s.artist)
-                                                        .build()
-                                                )
-                                                .build()
-                                        }
-                                        controller.setMediaItems(items, 0, 0L)
-                                        controller.prepare()
-                                        controller.play()
-                                    }
-                                }
-                            }
+                            .clickable { actionsPlaylist = playlist }
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
                         Text(playlist.name)
@@ -129,6 +132,8 @@ fun PlaylistTab(controller: MediaController) {
             Button(
                 onClick = {
                     newName = ""
+                    renamingPlaylist = null
+                    addingToPlaylist = null
                     showNameDialog = true
                 },
                 modifier = Modifier
@@ -140,10 +145,154 @@ fun PlaylistTab(controller: MediaController) {
         }
     }
 
+    // ---------- Popup azioni playlist ----------
+    actionsPlaylist?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = { actionsPlaylist = null },
+            title = { Text(playlist.name) },
+            text = {
+                Column {
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        scope.launch {
+                            val songs = dao.getSongs(playlist.id)
+                            if (songs.isNotEmpty()) {
+                                val items = songs.map { s ->
+                                    MediaItem.Builder()
+                                        .setUri(s.uri)
+                                        .setMediaId(s.mediaId.toString())
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(s.title)
+                                                .setArtist(s.artist)
+                                                .build()
+                                        )
+                                        .build()
+                                }
+                                controller.setMediaItems(items, 0, 0L)
+                                controller.prepare()
+                                controller.play()
+                            }
+                        }
+                    }) { Text("Riproduci") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        openedPlaylist = playlist
+                    }) { Text("Vedi brani") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        selectedIds = emptySet()
+                        addingToPlaylist = playlist
+                        if (hasPermission) {
+                            allFiles = queryAudioFiles(context)
+                            showFileDialog = true
+                        } else {
+                            permissionLauncher.launch(
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                                    Manifest.permission.READ_MEDIA_AUDIO
+                                else
+                                    Manifest.permission.READ_EXTERNAL_STORAGE
+                            )
+                        }
+                    }) { Text("Aggiungi brani") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        newName = playlist.name
+                        renamingPlaylist = playlist
+                        showNameDialog = true
+                    }) { Text("Rinomina") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        scope.launch { dao.deletePlaylist(playlist.id) }
+                    }) { Text("Elimina") }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { actionsPlaylist = null }) { Text("Chiudi") }
+            }
+        )
+    }
+
+    // ---------- Popup brani della playlist ----------
+    openedPlaylist?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = { openedPlaylist = null },
+            title = { Text(playlist.name) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (openedSongs.isEmpty()) {
+                        Text("Nessun brano")
+                    } else {
+                        openedSongs.forEach { song ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            val index = openedSongs.indexOf(song)
+                                            val items = openedSongs.map { s ->
+                                                MediaItem.Builder()
+                                                    .setUri(s.uri)
+                                                    .setMediaId(s.mediaId.toString())
+                                                    .setMediaMetadata(
+                                                        MediaMetadata.Builder()
+                                                            .setTitle(s.title)
+                                                            .setArtist(s.artist)
+                                                            .build()
+                                                    )
+                                                    .build()
+                                            }
+                                            controller.setMediaItems(items, index, 0L)
+                                            controller.prepare()
+                                            controller.play()
+                                        }
+                                ) {
+                                    Text(song.title, maxLines = 1)
+                                    Text(
+                                        song.artist,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        dao.removeSong(playlist.id, song.mediaId)
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Rimuovi")
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { openedPlaylist = null }) { Text("Chiudi") }
+            }
+        )
+    }
+
+    // ---------- Popup nome ----------
     if (showNameDialog) {
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
-            title = { Text("Nuova playlist") },
+            title = { Text(if (renamingPlaylist == null) "Nuova playlist" else "Rinomina") },
             text = {
                 OutlinedTextField(
                     value = newName,
@@ -156,17 +305,23 @@ fun PlaylistTab(controller: MediaController) {
                 TextButton(onClick = {
                     showNameDialog = false
                     if (newName.isNotBlank()) {
-                        selectedIds = emptySet()
-                        if (hasPermission) {
-                            allFiles = queryAudioFiles(context)
-                            showFileDialog = true
+                        val renaming = renamingPlaylist
+                        if (renaming != null) {
+                            scope.launch { dao.renamePlaylist(renaming.id, newName) }
                         } else {
-                            permissionLauncher.launch(
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                                    Manifest.permission.READ_MEDIA_AUDIO
-                                else
-                                    Manifest.permission.READ_EXTERNAL_STORAGE
-                            )
+                            selectedIds = emptySet()
+                            addingToPlaylist = null
+                            if (hasPermission) {
+                                allFiles = queryAudioFiles(context)
+                                showFileDialog = true
+                            } else {
+                                permissionLauncher.launch(
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                                        Manifest.permission.READ_MEDIA_AUDIO
+                                    else
+                                        Manifest.permission.READ_EXTERNAL_STORAGE
+                                )
+                            }
                         }
                     }
                 }) { Text("OK") }
@@ -177,10 +332,19 @@ fun PlaylistTab(controller: MediaController) {
         )
     }
 
+    // ---------- Popup selezione file ----------
     if (showFileDialog) {
         AlertDialog(
-            onDismissRequest = { showFileDialog = false },
-            title = { Text("Scegli i brani") },
+            onDismissRequest = {
+                showFileDialog = false
+                addingToPlaylist = null
+            },
+            title = {
+                Text(
+                    if (addingToPlaylist == null) "Scegli i brani"
+                    else "Aggiungi a ${addingToPlaylist?.name}"
+                )
+            },
             text = {
                 Column(
                     modifier = Modifier
@@ -203,8 +367,7 @@ fun PlaylistTab(controller: MediaController) {
                                     Text(file.title, maxLines = 1)
                                     Text(
                                         file.artist,
-                                        style = androidx.compose.material3.MaterialTheme
-                                            .typography.bodySmall,
+                                        style = MaterialTheme.typography.bodySmall,
                                         maxLines = 1
                                     )
                                 }
@@ -236,13 +399,22 @@ fun PlaylistTab(controller: MediaController) {
                             )
                         }
                     scope.launch {
-                        dao.createPlaylistWithSongs(newName, chosen)
+                        val adding = addingToPlaylist
+                        if (adding != null) {
+                            dao.addSongsToPlaylist(adding.id, chosen)
+                        } else {
+                            dao.createPlaylistWithSongs(newName, chosen)
+                        }
                     }
                     showFileDialog = false
+                    addingToPlaylist = null
                 }) { Text("Fatto") }
             },
             dismissButton = {
-                TextButton(onClick = { showFileDialog = false }) { Text("Annulla") }
+                TextButton(onClick = {
+                    showFileDialog = false
+                    addingToPlaylist = null
+                }) { Text("Annulla") }
             }
         )
     }
