@@ -10,7 +10,7 @@
 
     <application
         android:name=".SimplePlayerApp"
-        android:label="Simple Player"
+        android:label="Music Player"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.SimplePlayer">
 
