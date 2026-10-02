@@ -233,6 +233,10 @@ class PlaybackService : Service() {
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setShowActionsInCompactView(0, 1)
+            )
             .addAction(playPauseIcon, null, playPauseIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, null, closeIntent)
             .build()
