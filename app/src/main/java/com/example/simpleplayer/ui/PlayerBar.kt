@@ -33,7 +33,6 @@ fun PlayerBar(service: PlaybackService) {
     var isPlaying by remember { mutableStateOf(service.isPlayingNow()) }
     var title by remember { mutableStateOf(service.currentTitle()) }
 
-    // Aggiorna lo stato ogni 500 ms
     LaunchedEffect(service) {
         while (true) {
             isPlaying = service.isPlayingNow()
