@@ -12,9 +12,6 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        // Imposta il provider personalizzato
-        setMediaNotificationProvider(CustomMediaNotificationProvider(this))
-
         val player = ExoPlayer.Builder(this).build()
         mediaSession = MediaSession.Builder(this, player).build()
     }
@@ -24,12 +21,8 @@ class PlaybackService : MediaSessionService() {
     ): MediaSession? = mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Swipe via l'app dalle recenti → chiudi tutto
-        val player = mediaSession?.player
-        player?.stop()
-        player?.clearMediaItems()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        // NON fare nulla: il servizio continua a vivere in background.
+        // La musica suona anche se l'app viene chiusa dalle recenti.
         super.onTaskRemoved(rootIntent)
     }
 
