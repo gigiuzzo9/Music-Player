@@ -313,7 +313,6 @@ fun PlaylistTab(service: PlaybackService) {
 
     // ---------- Popup selezione file ----------
     if (showFileDialog) {
-        // Filtra i file nascosti anche nel popup di scelta
         val visibleFiles = allFiles.filter { it.id !in hiddenIds }
 
         AlertDialog(
@@ -417,8 +416,7 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         MediaStore.Audio.Media.ARTIST,
         MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
-            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
