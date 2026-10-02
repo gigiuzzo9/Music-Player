@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -19,18 +22,33 @@ import com.example.simpleplayer.playback.PlaybackService
 @Composable
 fun PlayerScreen(service: PlaybackService) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Tutti i file", "Playlist", "Nascosti")
 
     Column(modifier = Modifier.fillMaxSize()) {
 
         TabRow(selectedTabIndex = selectedTab) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title) }
-                )
-            }
+
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Tutti i file") }
+            )
+
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Playlist") }
+            )
+
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                icon = {
+                    Icon(
+                        Icons.Filled.VisibilityOff,
+                        contentDescription = "Nascosti"
+                    )
+                }
+            )
         }
 
         Column(
