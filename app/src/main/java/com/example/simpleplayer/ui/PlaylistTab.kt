@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,32 +41,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
 import com.example.simpleplayer.data.PlaylistSong
 import com.example.simpleplayer.model.AudioFile
 import kotlinx.coroutines.launch
 
 @Composable
-fun PlaylistTab() {
+fun PlaylistTab(controller: MediaController) {
 
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
     val dao = app.database.playlistDao()
     val scope = rememberCoroutineScope()
 
-    // Playlist osservate dal database
     val playlists by dao.observePlaylists().collectAsState(initial = emptyList())
 
-    // Popup 1: nome
     var showNameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
 
-    // Popup 2: selezione file
     var showFileDialog by remember { mutableStateOf(false) }
     var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
 
-    // Permesso audio (per il popup di selezione)
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -82,7 +82,6 @@ fun PlaylistTab() {
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasPermission = granted }
 
-    // Carica i file quando si apre il popup
     LaunchedEffect(showFileDialog) {
         if (showFileDialog && hasPermission) {
             allFiles = queryAudioFiles(context)
@@ -97,6 +96,28 @@ fun PlaylistTab() {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable {
+                                scope.launch {
+                                    val songs = dao.getSongs(playlist.id)
+                                    if (songs.isNotEmpty()) {
+                                        val items = songs.map { s ->
+                                            MediaItem.Builder()
+                                                .setUri(s.uri)
+                                                .setMediaId(s.mediaId.toString())
+                                                .setMediaMetadata(
+                                                    MediaMetadata.Builder()
+                                                        .setTitle(s.title)
+                                                        .setArtist(s.artist)
+                                                        .build()
+                                                )
+                                                .build()
+                                        }
+                                        controller.setMediaItems(items, 0, 0L)
+                                        controller.prepare()
+                                        controller.play()
+                                    }
+                                }
+                            }
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
                         Text(playlist.name)
@@ -119,7 +140,6 @@ fun PlaylistTab() {
         }
     }
 
-    // ---------- Popup 1: nome ----------
     if (showNameDialog) {
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
@@ -157,7 +177,6 @@ fun PlaylistTab() {
         )
     }
 
-    // ---------- Popup 2: selezione file ----------
     if (showFileDialog) {
         AlertDialog(
             onDismissRequest = { showFileDialog = false },
