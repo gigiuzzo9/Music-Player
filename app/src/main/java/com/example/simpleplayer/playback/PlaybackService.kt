@@ -227,9 +227,12 @@ class PlaybackService : Service() {
         else
             android.R.drawable.ic_media_play
 
+        val playPauseLabel = if (isPlaying) "Pausa" else "Play"
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(currentTitle())
+            .setContentText("Music Player")
             .setContentIntent(openAppIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
@@ -237,8 +240,8 @@ class PlaybackService : Service() {
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setShowActionsInCompactView(0, 1)
             )
-            .addAction(playPauseIcon, null, playPauseIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, null, closeIntent)
+            .addAction(playPauseIcon, playPauseLabel, playPauseIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Chiudi", closeIntent)
             .build()
     }
 
