@@ -46,17 +46,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
 import com.example.simpleplayer.data.Playlist
 import com.example.simpleplayer.data.PlaylistSong
 import com.example.simpleplayer.model.AudioFile
+import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
 
 @Composable
-fun PlaylistTab(controller: MediaController) {
+fun PlaylistTab(service: PlaybackService) {
 
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
@@ -65,25 +63,20 @@ fun PlaylistTab(controller: MediaController) {
 
     val playlists by dao.observePlaylists().collectAsState(initial = emptyList())
 
-    // Popup nome (nuova / rinomina)
     var showNameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var renamingPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
-    // Popup selezione file (nuova playlist O aggiunta a esistente)
     var showFileDialog by remember { mutableStateOf(false) }
     var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var addingToPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
-    // Popup dettaglio playlist
     var openedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var openedSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
 
-    // Popup azioni
     var actionsPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
-    // Permesso
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -157,21 +150,8 @@ fun PlaylistTab(controller: MediaController) {
                         scope.launch {
                             val songs = dao.getSongs(playlist.id)
                             if (songs.isNotEmpty()) {
-                                val items = songs.map { s ->
-                                    MediaItem.Builder()
-                                        .setUri(s.uri)
-                                        .setMediaId(s.mediaId.toString())
-                                        .setMediaMetadata(
-                                            MediaMetadata.Builder()
-                                                .setTitle(s.title)
-                                                .setArtist(s.artist)
-                                                .build()
-                                        )
-                                        .build()
-                                }
-                                controller.setMediaItems(items, 0, 0L)
-                                controller.prepare()
-                                controller.play()
+                                val queue = songs.map { it.uri to it.title }
+                                service.playQueue(queue, 0)
                             }
                         }
                     }) { Text("Riproduci") }
@@ -245,21 +225,8 @@ fun PlaylistTab(controller: MediaController) {
                                         .weight(1f)
                                         .clickable {
                                             val index = openedSongs.indexOf(song)
-                                            val items = openedSongs.map { s ->
-                                                MediaItem.Builder()
-                                                    .setUri(s.uri)
-                                                    .setMediaId(s.mediaId.toString())
-                                                    .setMediaMetadata(
-                                                        MediaMetadata.Builder()
-                                                            .setTitle(s.title)
-                                                            .setArtist(s.artist)
-                                                            .build()
-                                                    )
-                                                    .build()
-                                            }
-                                            controller.setMediaItems(items, index, 0L)
-                                            controller.prepare()
-                                            controller.play()
+                                            val queue = openedSongs.map { it.uri to it.title }
+                                            service.playQueue(queue, index)
                                         }
                                 ) {
                                     Text(song.title, maxLines = 1)
