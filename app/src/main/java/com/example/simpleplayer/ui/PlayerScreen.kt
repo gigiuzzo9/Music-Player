@@ -1,20 +1,26 @@
 package com.example.simpleplayer.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.simpleplayer.playback.PlaybackService
@@ -25,30 +31,42 @@ fun PlayerScreen(service: PlaybackService) {
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        TabRow(selectedTabIndex = selectedTab) {
+        // --- Barra tab personalizzata ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
 
-            Tab(
+            TabItem(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("Tutti i file") }
-            )
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Tutti i file")
+            }
 
-            Tab(
+            TabItem(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("Playlist") }
-            )
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Playlist")
+            }
 
-            Tab(
+            // Tab Nascosti: 12% della larghezza
+            TabItem(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
-                icon = {
-                    Icon(
-                        Icons.Filled.VisibilityOff,
-                        contentDescription = "Nascosti"
-                    )
-                }
-            )
+                modifier = Modifier.weight(0.25f)
+            ) {
+                Icon(
+                    Icons.Filled.VisibilityOff,
+                    contentDescription = "Nascosti"
+                )
+            }
         }
 
         Column(
@@ -70,6 +88,29 @@ fun PlayerScreen(service: PlaybackService) {
                 .padding(horizontal = 8.dp)
         ) {
             PlayerBar(service = service)
+        }
+    }
+}
+
+@Composable
+private fun TabItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides
+                    if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+        ) {
+            content()
         }
     }
 }
