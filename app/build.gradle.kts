@@ -1,8 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
-    id("androidx.room") version "2.8.4"
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
+    id("androidx.room")
 }
 
 android {
@@ -36,14 +37,18 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.compose.material:material-icons-extended")
 
-    // Media3 (ExoPlayer + Session)
+    // Media3
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-session:1.11.1")
     implementation("androidx.media3:media3-ui-compose-material3:1.11.1")
 
-    // Room (database locale per le playlist)
+    // Room
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
+
+    // Guava (serve per ListenableFuture in MainActivity)
+    implementation("com.google.guava:guava:33.0.0-android")
 }
