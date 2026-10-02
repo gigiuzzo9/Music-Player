@@ -1,7 +1,6 @@
 package com.example.simpleplayer.playback
 
 import android.content.Intent
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -9,25 +8,12 @@ import androidx.media3.session.MediaSessionService
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
-    private var player: ExoPlayer? = null
 
     override fun onCreate() {
         super.onCreate()
 
-        val exo = ExoPlayer.Builder(this).build()
-        player = exo
-
-        mediaSession = MediaSession.Builder(this, exo).build()
-
-        exo.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (!isPlaying) {
-                    // In pausa: demota il servizio a background.
-                    // Così la notifica diventa swipeabile e non è più "appuntata".
-                    stopForeground(STOP_FOREGROUND_DETACH)
-                }
-            }
-        })
+        val player = ExoPlayer.Builder(this).build()
+        mediaSession = MediaSession.Builder(this, player).build()
     }
 
     override fun onGetSession(
@@ -35,10 +21,16 @@ class PlaybackService : MediaSessionService() {
     ): MediaSession? = mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Swipe via l'app dalle recenti → chiudi tutto
-        val p = mediaSession?.player
-        p?.stop()
-        p?.clearMediaItems()
+        // Rilascia TUTTO: session + player.
+        // Senza questo, il processo resta vivo anche in riproduzione.
+        mediaSession?.run {
+            player.stop()
+            player.clearMediaItems()
+            player.release()
+            release()
+        }
+        mediaSession = null
+
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         super.onTaskRemoved(rootIntent)
@@ -50,7 +42,6 @@ class PlaybackService : MediaSessionService() {
             release()
         }
         mediaSession = null
-        player = null
         super.onDestroy()
     }
 }
