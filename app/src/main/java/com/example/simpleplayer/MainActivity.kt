@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.ComponentActivity
@@ -26,50 +25,25 @@ import com.example.simpleplayer.ui.theme.SimplePlayerTheme
 
 class MainActivity : ComponentActivity() {
 
-    // URI del file audio passato dall'esterno (null se apriamo normalmente)
-    private var pendingAudioUri: Uri? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Leggi l'URI all'avvio
-        pendingAudioUri = extractAudioUri(intent)
-
         setContent {
+            handleIntent(intent)
             SimplePlayerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    PlayerApp(pendingAudioUri)
+                    PlayerApp()
                 }
             }
         }
     }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-
-        // Se l'app è già aperta e arriva un nuovo file audio
-        val uri = extractAudioUri(intent)
-        if (uri != null) {
-            pendingAudioUri = uri
-            // Notifica il composable che c'è un nuovo URI
-            // (nel nostro caso lo gestiamo tramite il service nel composable)
-        }
-    }
-
-    private fun extractAudioUri(intent: Intent?): Uri? {
-        if (intent?.action == Intent.ACTION_VIEW) {
-            return intent.data
-        }
-        return null
-    }
 }
 
 @Composable
-fun PlayerApp(initialUri: Uri?) {
+fun PlayerApp() {
     val context = LocalContext.current
     var service by remember { mutableStateOf<PlaybackService?>(null) }
 
@@ -77,13 +51,7 @@ fun PlayerApp(initialUri: Uri?) {
         val connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 val localBinder = binder as PlaybackService.LocalBinder
-                val svc = localBinder.getService()
-                service = svc
-
-                // Se c'è un URI pendente, riproducilo
-                if (initialUri != null) {
-                    svc.playFromUri(context, initialUri)
-                }
+                service = localBinder.getService()
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -103,3 +71,4 @@ fun PlayerApp(initialUri: Uri?) {
     val s = service ?: return
     PlayerScreen(service = s)
 }
+
