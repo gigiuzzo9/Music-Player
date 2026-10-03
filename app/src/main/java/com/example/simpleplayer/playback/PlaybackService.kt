@@ -112,6 +112,12 @@ class PlaybackService : Service() {
         mediaPlayer?.seekTo(ms.toInt())
     }
 
+    fun skipBy(ms: Long) {
+        val mp = mediaPlayer ?: return
+        val newPos = (mp.currentPosition + ms).coerceIn(0L, mp.duration.toLong())
+        mp.seekTo(newPos.toInt())
+    }
+
     fun getRepeatMode(): RepeatMode = repeatMode
 
     fun cycleRepeatMode() {
