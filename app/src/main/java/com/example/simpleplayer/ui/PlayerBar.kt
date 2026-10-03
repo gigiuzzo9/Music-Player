@@ -41,7 +41,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.simpleplayer.R
 import com.example.simpleplayer.playback.PlaybackService
 import com.example.simpleplayer.playback.RepeatMode
@@ -82,13 +81,13 @@ fun PlayerBar(service: PlaybackService) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         Text(
             title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -97,23 +96,23 @@ fun PlayerBar(service: PlaybackService) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp),
+                .padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = { service.skipBy(-10_000L) },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Image(
                     painter = painterResource(R.drawable.ic_replay_10),
                     contentDescription = "-10 secondi",
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
             Text(
                 formatTime(if (isUserDragging) dragPosition.toLong() else position),
-                fontSize = 14.sp
+                style = MaterialTheme.typography.labelSmall
             )
 
             Slider(
@@ -130,12 +129,12 @@ fun PlayerBar(service: PlaybackService) {
                 valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
                 modifier = Modifier
                     .weight(1f)
-                    .height(26.dp)
+                    .height(24.dp)
                     .padding(horizontal = 8.dp),
                 thumb = {
                     Box(
                         modifier = Modifier
-                            .size(14.dp)
+                            .size(12.dp)
                             .background(
                                 MaterialTheme.colorScheme.primary,
                                 shape = CircleShape
@@ -154,17 +153,17 @@ fun PlayerBar(service: PlaybackService) {
 
             Text(
                 formatTime(duration),
-                fontSize = 14.sp
+                style = MaterialTheme.typography.labelSmall
             )
 
             IconButton(
                 onClick = { service.skipBy(10_000L) },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Image(
                     painter = painterResource(R.drawable.ic_forward_10),
                     contentDescription = "+10 secondi",
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -176,51 +175,29 @@ fun PlayerBar(service: PlaybackService) {
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            IconButton(
-                onClick = { service.previous() },
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(
-                    Icons.Filled.SkipPrevious,
-                    contentDescription = "Indietro",
-                    modifier = Modifier.size(40.dp)
-                )
+            IconButton(onClick = { service.previous() }) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Indietro")
             }
 
-            IconButton(
-                onClick = { service.togglePlayPause() },
-                modifier = Modifier.size(72.dp)
-            ) {
+            IconButton(onClick = { service.togglePlayPause() }) {
                 Icon(
                     if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "Pausa" else "Play",
-                    modifier = Modifier.size(52.dp)
+                    contentDescription = if (isPlaying) "Pausa" else "Play"
                 )
             }
 
-            IconButton(
-                onClick = { service.next() },
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(
-                    Icons.Filled.SkipNext,
-                    contentDescription = "Avanti",
-                    modifier = Modifier.size(40.dp)
-                )
+            IconButton(onClick = { service.next() }) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "Avanti")
             }
 
-            IconButton(
-                onClick = { service.cycleRepeatMode() },
-                modifier = Modifier.size(56.dp)
-            ) {
+            IconButton(onClick = { service.cycleRepeatMode() }) {
                 Icon(
                     imageVector = if (repeatMode == RepeatMode.ONE)
                         Icons.Filled.RepeatOne
                     else
                         Icons.Filled.Repeat,
                     contentDescription = "Ripeti",
-                    tint = repeatTint,
-                    modifier = Modifier.size(40.dp)
+                    tint = repeatTint
                 )
             }
         }
