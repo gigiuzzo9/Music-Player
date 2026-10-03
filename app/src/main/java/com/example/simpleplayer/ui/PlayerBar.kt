@@ -1,10 +1,12 @@
 package com.example.simpleplayer.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -28,8 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.simpleplayer.R
 import com.example.simpleplayer.playback.PlaybackService
 import com.example.simpleplayer.playback.RepeatMode
 import kotlinx.coroutines.delay
@@ -79,13 +83,24 @@ fun PlayerBar(service: PlaybackService) {
             overflow = TextOverflow.Ellipsis
         )
 
-        // --- Seekbar + tempi ---
+        // --- Seekbar + tempi + pulsanti -10s / +10s ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = { service.skipBy(-10_000L) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_replay_10),
+                    contentDescription = "-10 secondi",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
             Text(
                 formatTime(if (isUserDragging) dragPosition.toLong() else position),
                 style = MaterialTheme.typography.labelSmall
@@ -112,6 +127,17 @@ fun PlayerBar(service: PlaybackService) {
                 formatTime(duration),
                 style = MaterialTheme.typography.labelSmall
             )
+
+            IconButton(
+                onClick = { service.skipBy(10_000L) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_forward_10),
+                    contentDescription = "+10 secondi",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         // --- Pulsanti ---
