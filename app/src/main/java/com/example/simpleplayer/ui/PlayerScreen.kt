@@ -87,7 +87,6 @@ fun PlayerScreen(service: PlaybackService) {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.28f)
-                .padding(horizontal = 8.dp)
         ) {
             PlayerBar(service = service)
         }
@@ -112,7 +111,23 @@ private fun TabItem(
                     if (selected) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
         ) {
-            content()
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+            ) {
+                content()
+                // Sottolineatura quando selezionata
+                Box(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .height(2.dp)
+                        .fillMaxWidth(0.6f)
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else androidx.compose.ui.graphics.Color.Transparent
+                        )
+                )
+            }
         }
     }
 }
