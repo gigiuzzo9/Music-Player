@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.example.simpleplayer.ui
 
 import android.Manifest
@@ -8,6 +10,7 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +18,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -243,7 +245,7 @@ fun PlaylistTab(service: PlaybackService) {
         )
     }
 
-    // ---------- Popup brani della playlist (con drag & drop se orderingMode) ----------
+    // ---------- Popup brani della playlist ----------
     openedPlaylist?.let { playlist ->
         if (orderingMode) {
             // Modalità ordinamento con drag & drop
@@ -262,7 +264,6 @@ fun PlaylistTab(service: PlaybackService) {
 
             AlertDialog(
                 onDismissRequest = {
-                    // Salva l'ordine quando si chiude
                     scope.launch {
                         dao.reorderSongs(playlist.id, localSongs.map { it.id })
                     }
@@ -278,7 +279,7 @@ fun PlaylistTab(service: PlaybackService) {
                             .heightIn(max = 300.dp)
                     ) {
                         items(localSongs, key = { it.id }) { song ->
-                            ReorderableItem(reorderableState, key = song.id) { isDragging ->
+                            ReorderableItem(reorderableState, key = song.id) { _ ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -289,7 +290,7 @@ fun PlaylistTab(service: PlaybackService) {
                                         Icons.Filled.DragHandle,
                                         contentDescription = "Trascina",
                                         modifier = Modifier
-                                            .draggableHandle()
+                                            .draggableHandle(onDragStopped = {})
                                             .padding(end = 8.dp)
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
@@ -322,7 +323,6 @@ fun PlaylistTab(service: PlaybackService) {
                 }
             )
         } else {
-            // Modalità normale: vedi brani / elimina brani
             AlertDialog(
                 onDismissRequest = {
                     openedPlaylist = null
