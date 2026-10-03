@@ -4,10 +4,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,14 +30,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        enableEdgeToEdge()
+
+        // Leggi l'URI ricevuto da "Apri con"
+        val incomingUri: Uri? = intent?.data
+
         setContent {
-            handleIntent(intent)
             SimplePlayerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    PlayerApp()
+                    PlayerApp(incomingUri = incomingUri)
                 }
             }
         }
@@ -43,7 +49,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PlayerApp() {
+fun PlayerApp(incomingUri: Uri?) {
     val context = LocalContext.current
     var service by remember { mutableStateOf<PlaybackService?>(null) }
 
@@ -52,6 +58,15 @@ fun PlayerApp() {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 val localBinder = binder as PlaybackService.LocalBinder
                 service = localBinder.getService()
+
+                // Se è arrivato un URI da "Apri con", riproducilo
+                if (incomingUri != null) {
+                    val title = incomingUri.lastPathSegment ?: "Brano"
+                    service?.playQueue(
+                        listOf(incomingUri.toString() to title),
+                        0
+                    )
+                }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -71,4 +86,3 @@ fun PlayerApp() {
     val s = service ?: return
     PlayerScreen(service = s)
 }
-
