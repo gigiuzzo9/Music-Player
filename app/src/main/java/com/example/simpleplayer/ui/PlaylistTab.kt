@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,6 +80,12 @@ fun PlaylistTab(service: PlaybackService) {
 
     var actionsPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
+    // Conferma eliminazione playlist
+    var deleteConfirmPlaylist by remember { mutableStateOf<Playlist?>(null) }
+
+    // Modalità "Elimina brani" nella playlist aperta
+    var deletingMode by remember { mutableStateOf(false) }
+
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -123,7 +130,8 @@ fun PlaylistTab(service: PlaybackService) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { actionsPlaylist = playlist }
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            // MODIFICA 1: più spazio verticale
+                            .padding(horizontal = 16.dp, vertical = 20.dp)
                     ) {
                         Text(playlist.name)
                     }
@@ -166,10 +174,12 @@ fun PlaylistTab(service: PlaybackService) {
                         }
                     }) { Text("Riproduci") }
 
+                    // MODIFICA 2: "Vedi brani" → "Elimina brani"
                     TextButton(onClick = {
                         actionsPlaylist = null
                         openedPlaylist = playlist
-                    }) { Text("Vedi brani") }
+                        deletingMode = true
+                    }) { Text("Elimina brani") }
 
                     TextButton(onClick = {
                         actionsPlaylist = null
@@ -196,9 +206,10 @@ fun PlaylistTab(service: PlaybackService) {
                         showNameDialog = true
                     }) { Text("Rinomina") }
 
+                    // MODIFICA 4: elimina con conferma
                     TextButton(onClick = {
                         actionsPlaylist = null
-                        scope.launch { dao.deletePlaylist(playlist.id) }
+                        deleteConfirmPlaylist = playlist
                     }) { Text("Elimina") }
                 }
             },
@@ -209,16 +220,38 @@ fun PlaylistTab(service: PlaybackService) {
         )
     }
 
+    // ---------- Popup conferma eliminazione playlist (MODIFICA 4) ----------
+    deleteConfirmPlaylist?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = { deleteConfirmPlaylist = null },
+            title = { Text("Eliminare la playlist?") },
+            text = { Text("\"${playlist.name}\" verrà eliminata definitivamente.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { dao.deletePlaylist(playlist.id) }
+                    deleteConfirmPlaylist = null
+                }) { Text("Elimina") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteConfirmPlaylist = null }) { Text("Annulla") }
+            }
+        )
+    }
+
     // ---------- Popup brani della playlist ----------
     openedPlaylist?.let { playlist ->
         AlertDialog(
-            onDismissRequest = { openedPlaylist = null },
+            onDismissRequest = {
+                openedPlaylist = null
+                deletingMode = false
+            },
             title = { Text(playlist.name) },
+            // MODIFICA 3: stessa dimensione del popup azioni
             text = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(400.dp)
+                        .heightIn(max = 300.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
                     if (openedSongs.isEmpty()) {
@@ -235,9 +268,11 @@ fun PlaylistTab(service: PlaybackService) {
                                     modifier = Modifier
                                         .weight(1f)
                                         .clickable {
-                                            val index = openedSongs.indexOf(song)
-                                            val queue = openedSongs.map { it.uri to it.title }
-                                            service.playQueue(queue, index)
+                                            if (!deletingMode) {
+                                                val index = openedSongs.indexOf(song)
+                                                val queue = openedSongs.map { it.uri to it.title }
+                                                service.playQueue(queue, index)
+                                            }
                                         }
                                 ) {
                                     Text(song.title, maxLines = 1)
@@ -247,12 +282,15 @@ fun PlaylistTab(service: PlaybackService) {
                                         maxLines = 1
                                     )
                                 }
-                                IconButton(onClick = {
-                                    scope.launch {
-                                        dao.removeSong(playlist.id, song.mediaId)
+                                // In modalità "elimina brani" mostra sempre la X
+                                if (deletingMode) {
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            dao.removeSong(playlist.id, song.mediaId)
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Rimuovi")
                                     }
-                                }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Rimuovi")
                                 }
                             }
                         }
@@ -261,7 +299,10 @@ fun PlaylistTab(service: PlaybackService) {
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { openedPlaylist = null }) { Text("Chiudi") }
+                TextButton(onClick = {
+                    openedPlaylist = null
+                    deletingMode = false
+                }) { Text("Chiudi") }
             }
         )
     }
@@ -327,11 +368,12 @@ fun PlaylistTab(service: PlaybackService) {
                     else "Scegli i brani"
                 )
             },
+            // MODIFICA 3: stessa dimensione del popup azioni
             text = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(400.dp)
+                        .heightIn(max = 300.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
                     if (visibleFiles.isEmpty()) {
