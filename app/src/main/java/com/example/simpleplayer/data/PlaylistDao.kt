@@ -41,6 +41,9 @@ interface PlaylistDao {
     @Query("SELECT COUNT(*) FROM playlist_songs WHERE playlistId = :playlistId")
     suspend fun countSongs(playlistId: Long): Int
 
+    @Query("UPDATE playlist_songs SET position = :position WHERE id = :songId")
+    suspend fun updateSongPosition(songId: Long, position: Int)
+
     // --- File nascosti ---
 
     @Query("SELECT mediaId FROM hidden_files")
@@ -70,5 +73,17 @@ interface PlaylistDao {
             song.copy(playlistId = playlistId, position = startPos + index)
         }
         insertSongs(fixed)
+    }
+
+    /**
+     * Salva il nuovo ordine dei brani.
+     * Riceve la lista degli id dei brani nell'ordine desiderato
+     * e aggiorna la posizione di ciascuno.
+     */
+    @Transaction
+    suspend fun reorderSongs(playlistId: Long, orderedSongIds: List<Long>) {
+        orderedSongIds.forEachIndexed { index, songId ->
+            updateSongPosition(songId, index)
+        }
     }
 }
