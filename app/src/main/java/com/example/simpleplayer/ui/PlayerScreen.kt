@@ -5,9 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -22,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
@@ -31,6 +35,9 @@ fun PlayerScreen(service: PlaybackService) {
 
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
+
+    // Altezza della navigation bar di Android
+    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -83,12 +90,21 @@ fun PlayerScreen(service: PlaybackService) {
             }
         }
 
+        // Player: sfondo grigio fino al bordo inferiore,
+        // contenuto alzato di quanto basta per non finire sotto i 3 pulsanti Android
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.28f)
+                .weight(0.35f)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            PlayerBar(service = service)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = navBarPadding.calculateBottomPadding())
+            ) {
+                PlayerBar(service = service)
+            }
         }
     }
 }
@@ -116,7 +132,6 @@ private fun TabItem(
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
             ) {
                 content()
-                // Sottolineatura quando selezionata
                 Box(
                     modifier = Modifier
                         .padding(top = 4.dp)
@@ -124,7 +139,7 @@ private fun TabItem(
                         .fillMaxWidth(0.6f)
                         .background(
                             if (selected) MaterialTheme.colorScheme.primary
-                            else androidx.compose.ui.graphics.Color.Transparent
+                            else Color.Transparent
                         )
                 )
             }
