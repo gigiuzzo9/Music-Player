@@ -39,11 +39,14 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Room (database locale per le playlist)
+    // Room
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
 
-    // MediaStyle per la notifica (obbligatorio per il background)
+    // MediaStyle per la notifica
     implementation("androidx.media:media:1.7.0")
+
+    // Libreria per drag & drop nelle liste
+    implementation("sh.calvin.reorderable:reorderable:2.3.0")
 }
