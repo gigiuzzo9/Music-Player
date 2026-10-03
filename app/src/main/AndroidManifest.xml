@@ -15,26 +15,24 @@
         android:theme="@style/Theme.SimplePlayer">
 
         <activity
-    android:name=".MainActivity"
-    android:exported="true"
-    android:theme="@style/Theme.SimplePlayer">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SimplePlayer">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
 
-    <!-- Intent filter esistente (LAUNCHER) -->
-    <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-    </intent-filter>
-
-    <!-- AGGIUNGI QUESTO: per aprire file audio -->
-    <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <data android:mimeType="audio/*" />
-        <data android:mimeType="application/ogg" />
-        <data android:mimeType="application/x-ogg" />
-    </intent-filter>
-
-</activity>
+            <!-- Per "Apri con" sui file audio -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".playback.PlaybackService"
