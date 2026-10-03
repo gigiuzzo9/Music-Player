@@ -90,7 +90,7 @@ fun PlaylistTab(service: PlaybackService) {
     var deletingMode by remember { mutableStateOf(false) }
     var orderingMode by remember { mutableStateOf(false) }
 
-    // Copia locale per il drag & drop
+    // Copia locale per il drag & drop (caricata una volta dal DB)
     var localSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
 
     var hasPermission by remember {
@@ -125,13 +125,6 @@ fun PlaylistTab(service: PlaybackService) {
         val pl = openedPlaylist
         if (pl != null) {
             dao.observeSongs(pl.id).collect { openedSongs = it }
-        }
-    }
-
-    // Quando entro in modalità ordinamento, copia la lista
-    LaunchedEffect(orderingMode, openedSongs) {
-        if (orderingMode) {
-            localSongs = openedSongs
         }
     }
 
@@ -207,8 +200,12 @@ fun PlaylistTab(service: PlaybackService) {
 
                     TextButton(onClick = {
                         actionsPlaylist = null
-                        openedPlaylist = playlist
-                        orderingMode = true
+                        scope.launch {
+                            // Carica i brani UNA VOLTA dal DB (no Flow)
+                            localSongs = dao.getSongs(playlist.id)
+                            openedPlaylist = playlist
+                            orderingMode = true
+                        }
                     }) { Text("Ordina brani") }
 
                     TextButton(onClick = {
