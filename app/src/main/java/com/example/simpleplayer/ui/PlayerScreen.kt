@@ -2,6 +2,7 @@ package com.example.simpleplayer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,13 +28,17 @@ import androidx.compose.ui.unit.dp
 import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
 
-private val HeaderBackground = Color(0xFF2F2F2F)
-
 @Composable
 fun PlayerScreen(service: PlaybackService) {
 
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
+
+    val headerBackground = if (isSystemInDarkTheme()) {
+        Color(0xFF2F2F2F)   // tema scuro
+    } else {
+        Color(0xFFE0E0E0)   // tema chiaro
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -41,7 +46,7 @@ fun PlayerScreen(service: PlaybackService) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .background(HeaderBackground),
+                .background(headerBackground),
             verticalAlignment = Alignment.CenterVertically
         ) {
 
@@ -90,7 +95,7 @@ fun PlayerScreen(service: PlaybackService) {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.35f)
-                .background(HeaderBackground)
+                .background(headerBackground)
         ) {
             Box(
                 modifier = Modifier
