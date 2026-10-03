@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -53,6 +55,8 @@ import com.example.simpleplayer.data.PlaylistSong
 import com.example.simpleplayer.model.AudioFile
 import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun PlaylistTab(service: PlaybackService) {
@@ -79,12 +83,10 @@ fun PlaylistTab(service: PlaybackService) {
     var openedSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
 
     var actionsPlaylist by remember { mutableStateOf<Playlist?>(null) }
-
-    // Conferma eliminazione playlist
     var deleteConfirmPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
-    // Modalità "Elimina brani" nella playlist aperta
     var deletingMode by remember { mutableStateOf(false) }
+    var orderingMode by remember { mutableStateOf(false) }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -130,7 +132,6 @@ fun PlaylistTab(service: PlaybackService) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { actionsPlaylist = playlist }
-                            // MODIFICA 1: più spazio verticale
                             .padding(horizontal = 16.dp, vertical = 20.dp)
                     ) {
                         Text(playlist.name)
@@ -174,12 +175,17 @@ fun PlaylistTab(service: PlaybackService) {
                         }
                     }) { Text("Riproduci") }
 
-                    // MODIFICA 2: "Vedi brani" → "Elimina brani"
                     TextButton(onClick = {
                         actionsPlaylist = null
                         openedPlaylist = playlist
                         deletingMode = true
                     }) { Text("Elimina brani") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        openedPlaylist = playlist
+                        orderingMode = true
+                    }) { Text("Ordina brani") }
 
                     TextButton(onClick = {
                         actionsPlaylist = null
@@ -206,7 +212,6 @@ fun PlaylistTab(service: PlaybackService) {
                         showNameDialog = true
                     }) { Text("Rinomina") }
 
-                    // MODIFICA 4: elimina con conferma
                     TextButton(onClick = {
                         actionsPlaylist = null
                         deleteConfirmPlaylist = playlist
@@ -220,7 +225,7 @@ fun PlaylistTab(service: PlaybackService) {
         )
     }
 
-    // ---------- Popup conferma eliminazione playlist (MODIFICA 4) ----------
+    // ---------- Popup conferma eliminazione playlist ----------
     deleteConfirmPlaylist?.let { playlist ->
         AlertDialog(
             onDismissRequest = { deleteConfirmPlaylist = null },
@@ -238,73 +243,150 @@ fun PlaylistTab(service: PlaybackService) {
         )
     }
 
-    // ---------- Popup brani della playlist ----------
+    // ---------- Popup brani della playlist (con drag & drop se orderingMode) ----------
     openedPlaylist?.let { playlist ->
-        AlertDialog(
-            onDismissRequest = {
-                openedPlaylist = null
-                deletingMode = false
-            },
-            title = { Text(playlist.name) },
-            // MODIFICA 3: stessa dimensione del popup azioni
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    if (openedSongs.isEmpty()) {
-                        Text("Nessun brano")
-                    } else {
-                        openedSongs.forEach { song ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(
+        if (orderingMode) {
+            // Modalità ordinamento con drag & drop
+            var localSongs by remember(playlist.id) { mutableStateOf(openedSongs) }
+
+            LaunchedEffect(openedSongs) {
+                if (!orderingMode) localSongs = openedSongs
+            }
+
+            val lazyListState = rememberLazyListState()
+            val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                localSongs = localSongs.toMutableList().apply {
+                    add(to.index, removeAt(from.index))
+                }
+            }
+
+            AlertDialog(
+                onDismissRequest = {
+                    // Salva l'ordine quando si chiude
+                    scope.launch {
+                        dao.reorderSongs(playlist.id, localSongs.map { it.id })
+                    }
+                    openedPlaylist = null
+                    orderingMode = false
+                },
+                title = { Text("Ordina: ${playlist.name}") },
+                text = {
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp)
+                    ) {
+                        items(localSongs, key = { it.id }) { song ->
+                            ReorderableItem(reorderableState, key = song.id) { isDragging ->
+                                Row(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .clickable {
-                                            if (!deletingMode) {
-                                                val index = openedSongs.indexOf(song)
-                                                val queue = openedSongs.map { it.uri to it.title }
-                                                service.playQueue(queue, index)
-                                            }
-                                        }
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(song.title, maxLines = 1)
-                                    Text(
-                                        song.artist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1
+                                    Icon(
+                                        Icons.Filled.DragHandle,
+                                        contentDescription = "Trascina",
+                                        modifier = Modifier
+                                            .draggableHandle()
+                                            .padding(end = 8.dp)
                                     )
-                                }
-                                // In modalità "elimina brani" mostra sempre la X
-                                if (deletingMode) {
-                                    IconButton(onClick = {
-                                        scope.launch {
-                                            dao.removeSong(playlist.id, song.mediaId)
-                                        }
-                                    }) {
-                                        Icon(Icons.Filled.Close, contentDescription = "Rimuovi")
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(song.title, maxLines = 1)
+                                        Text(
+                                            song.artist,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1
+                                        )
                                     }
                                 }
                             }
                         }
                     }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        scope.launch {
+                            dao.reorderSongs(playlist.id, localSongs.map { it.id })
+                        }
+                        openedPlaylist = null
+                        orderingMode = false
+                    }) { Text("Salva") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        openedPlaylist = null
+                        orderingMode = false
+                    }) { Text("Annulla") }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = {
+            )
+        } else {
+            // Modalità normale: vedi brani / elimina brani
+            AlertDialog(
+                onDismissRequest = {
                     openedPlaylist = null
                     deletingMode = false
-                }) { Text("Chiudi") }
-            }
-        )
+                },
+                title = { Text(playlist.name) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        if (openedSongs.isEmpty()) {
+                            Text("Nessun brano")
+                        } else {
+                            openedSongs.forEach { song ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                if (!deletingMode) {
+                                                    val index = openedSongs.indexOf(song)
+                                                    val queue = openedSongs.map { it.uri to it.title }
+                                                    service.playQueue(queue, index)
+                                                }
+                                            }
+                                    ) {
+                                        Text(song.title, maxLines = 1)
+                                        Text(
+                                            song.artist,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    if (deletingMode) {
+                                        IconButton(onClick = {
+                                            scope.launch {
+                                                dao.removeSong(playlist.id, song.mediaId)
+                                            }
+                                        }) {
+                                            Icon(Icons.Filled.Close, contentDescription = "Rimuovi")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = {
+                        openedPlaylist = null
+                        deletingMode = false
+                    }) { Text("Chiudi") }
+                }
+            )
+        }
     }
 
     // ---------- Popup nome ----------
@@ -368,7 +450,6 @@ fun PlaylistTab(service: PlaybackService) {
                     else "Scegli i brani"
                 )
             },
-            // MODIFICA 3: stessa dimensione del popup azioni
             text = {
                 Column(
                     modifier = Modifier
