@@ -179,18 +179,6 @@ fun PlaylistTab(service: PlaybackService) {
 
                     TextButton(onClick = {
                         actionsPlaylist = null
-                        openedPlaylist = playlist
-                        deletingMode = true
-                    }) { Text("Elimina brani") }
-
-                    TextButton(onClick = {
-                        actionsPlaylist = null
-                        openedPlaylist = playlist
-                        orderingMode = true
-                    }) { Text("Ordina brani") }
-
-                    TextButton(onClick = {
-                        actionsPlaylist = null
                         selectedIds = emptySet()
                         addingToPlaylist = playlist
                         mode = "add"
@@ -206,6 +194,18 @@ fun PlaylistTab(service: PlaybackService) {
                             )
                         }
                     }) { Text("Aggiungi brani") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        openedPlaylist = playlist
+                        orderingMode = true
+                    }) { Text("Ordina brani") }
+
+                    TextButton(onClick = {
+                        actionsPlaylist = null
+                        openedPlaylist = playlist
+                        deletingMode = true
+                    }) { Text("Elimina brani") }
 
                     TextButton(onClick = {
                         actionsPlaylist = null
@@ -248,7 +248,6 @@ fun PlaylistTab(service: PlaybackService) {
     // ---------- Popup brani della playlist ----------
     openedPlaylist?.let { playlist ->
         if (orderingMode) {
-            // Modalità ordinamento con drag & drop
             var localSongs by remember(playlist.id) { mutableStateOf(openedSongs) }
 
             LaunchedEffect(openedSongs) {
