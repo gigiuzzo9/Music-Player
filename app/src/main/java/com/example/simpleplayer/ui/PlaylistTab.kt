@@ -90,7 +90,6 @@ fun PlaylistTab(service: PlaybackService) {
     var deletingMode by remember { mutableStateOf(false) }
     var orderingMode by remember { mutableStateOf(false) }
 
-    // Copia locale per il drag & drop (caricata una volta dal DB)
     var localSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
 
     var hasPermission by remember {
@@ -145,19 +144,24 @@ fun PlaylistTab(service: PlaybackService) {
                 }
             }
 
-            Button(
-                onClick = {
-                    newName = ""
-                    renamingPlaylist = null
-                    addingToPlaylist = null
-                    mode = ""
-                    showNameDialog = true
-                },
+            // Pulsante "Aggiungi playlist" allineato a destra
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("Aggiungi playlist")
+                Button(
+                    onClick = {
+                        newName = ""
+                        renamingPlaylist = null
+                        addingToPlaylist = null
+                        mode = ""
+                        showNameDialog = true
+                    }
+                ) {
+                    Text("Aggiungi playlist")
+                }
             }
         }
     }
@@ -201,7 +205,6 @@ fun PlaylistTab(service: PlaybackService) {
                     TextButton(onClick = {
                         actionsPlaylist = null
                         scope.launch {
-                            // Carica i brani UNA VOLTA dal DB (no Flow)
                             localSongs = dao.getSongs(playlist.id)
                             openedPlaylist = playlist
                             orderingMode = true
