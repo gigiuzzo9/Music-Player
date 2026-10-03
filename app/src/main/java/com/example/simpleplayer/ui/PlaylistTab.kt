@@ -90,6 +90,9 @@ fun PlaylistTab(service: PlaybackService) {
     var deletingMode by remember { mutableStateOf(false) }
     var orderingMode by remember { mutableStateOf(false) }
 
+    // Copia locale per il drag & drop
+    var localSongs by remember { mutableStateOf<List<PlaylistSong>>(emptyList()) }
+
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -122,6 +125,13 @@ fun PlaylistTab(service: PlaybackService) {
         val pl = openedPlaylist
         if (pl != null) {
             dao.observeSongs(pl.id).collect { openedSongs = it }
+        }
+    }
+
+    // Quando entro in modalità ordinamento, copia la lista
+    LaunchedEffect(orderingMode, openedSongs) {
+        if (orderingMode) {
+            localSongs = openedSongs
         }
     }
 
@@ -248,12 +258,6 @@ fun PlaylistTab(service: PlaybackService) {
     // ---------- Popup brani della playlist ----------
     openedPlaylist?.let { playlist ->
         if (orderingMode) {
-            var localSongs by remember(playlist.id) { mutableStateOf(openedSongs) }
-
-            LaunchedEffect(openedSongs) {
-                if (!orderingMode) localSongs = openedSongs
-            }
-
             val lazyListState = rememberLazyListState()
             val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
                 localSongs = localSongs.toMutableList().apply {
