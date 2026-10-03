@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
 
+private val HeaderBackground = Color(0xFF2F2F2F)
+
 @Composable
 fun PlayerScreen(service: PlaybackService) {
 
@@ -39,7 +41,7 @@ fun PlayerScreen(service: PlaybackService) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(HeaderBackground),
             verticalAlignment = Alignment.CenterVertically
         ) {
 
@@ -84,13 +86,11 @@ fun PlayerScreen(service: PlaybackService) {
             }
         }
 
-        // Player: sfondo grigio fino al bordo inferiore,
-        // contenuto alzato di 10dp per non stare attaccato ai pulsanti Android
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.35f)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(HeaderBackground)
         ) {
             Box(
                 modifier = Modifier
