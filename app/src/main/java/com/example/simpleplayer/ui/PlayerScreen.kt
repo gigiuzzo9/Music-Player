@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
@@ -17,18 +19,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.simpleplayer.playback.PlaybackService
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlayerScreen(service: PlaybackService) {
-    var selectedTab by remember { mutableStateOf(0) }
+
+    val pagerState = rememberPagerState(pageCount = { 3 })
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -41,24 +43,24 @@ fun PlayerScreen(service: PlaybackService) {
         ) {
 
             TabItem(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
+                selected = pagerState.currentPage == 0,
+                onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Tutti i file")
             }
 
             TabItem(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
+                selected = pagerState.currentPage == 1,
+                onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Playlist")
             }
 
             TabItem(
-                selected = selectedTab == 2,
-                onClick = { selectedTab = 2 },
+                selected = pagerState.currentPage == 2,
+                onClick = { scope.launch { pagerState.animateScrollToPage(2) } },
                 modifier = Modifier.weight(0.25f)
             ) {
                 Icon(
@@ -68,12 +70,13 @@ fun PlayerScreen(service: PlaybackService) {
             }
         }
 
-        Column(
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-        ) {
-            when (selectedTab) {
+        ) { page ->
+            when (page) {
                 0 -> FilesTab(service = service)
                 1 -> PlaylistTab(service = service)
                 2 -> HiddenTab()
