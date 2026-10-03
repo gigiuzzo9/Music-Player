@@ -5,12 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -35,9 +32,6 @@ fun PlayerScreen(service: PlaybackService) {
 
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
-
-    // Altezza della navigation bar di Android
-    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -91,7 +85,7 @@ fun PlayerScreen(service: PlaybackService) {
         }
 
         // Player: sfondo grigio fino al bordo inferiore,
-        // contenuto alzato di quanto basta per non finire sotto i 3 pulsanti Android
+        // contenuto alzato di 10dp per non stare attaccato ai pulsanti Android
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -101,7 +95,7 @@ fun PlayerScreen(service: PlaybackService) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = navBarPadding.calculateBottomPadding())
+                    .padding(bottom = 10.dp)
             ) {
                 PlayerBar(service = service)
             }
