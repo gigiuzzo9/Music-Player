@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -31,6 +32,8 @@ class PlaybackService : Service() {
 
     private lateinit var audioManager: AudioManager
     private var focusRequest: AudioFocusRequest? = null
+
+    private lateinit var prefs: SharedPreferences
 
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
@@ -60,7 +63,64 @@ class PlaybackService : Service() {
         super.onCreate()
         createNotificationChannel()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // Ripristina l'ultimo brano salvato
+        restoreLastTrack()
     }
+
+    // --- Ripristino stato ---
+
+    private fun restoreLastTrack() {
+        val savedUri = prefs.getString(KEY_LAST_URI, null) ?: return
+        val savedTitle = prefs.getString(KEY_LAST_TITLE, "Brano") ?: "Brano"
+        val savedRepeat = prefs.getString(KEY_REPEAT, "OFF") ?: "OFF"
+
+        repeatMode = when (savedRepeat) {
+            "ALL" -> RepeatMode.ALL
+            "ONE" -> RepeatMode.ONE
+            else -> RepeatMode.OFF
+        }
+
+        queue = listOf(savedUri to savedTitle)
+        currentIndex = 0
+
+        // Prepara il brano in pausa (senza play, senza focus)
+        mediaPlayer?.release()
+        mediaPlayer = MediaPlayer().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            isLooping = (repeatMode == RepeatMode.ONE)
+            setDataSource(this@PlaybackService, android.net.Uri.parse(savedUri))
+            setOnPreparedListener {
+                // NON parte da solo. Resta in pausa, pronto per il play.
+            }
+            setOnCompletionListener {
+                next()
+            }
+            prepareAsync()
+        }
+    }
+
+    private fun saveLastTrack() {
+        val item = queue.getOrNull(currentIndex) ?: return
+        prefs.edit()
+            .putString(KEY_LAST_URI, item.first)
+            .putString(KEY_LAST_TITLE, item.second)
+            .apply()
+    }
+
+    private fun saveRepeatMode() {
+        prefs.edit()
+            .putString(KEY_REPEAT, repeatMode.name)
+            .apply()
+    }
+
+    // --- Controlli pubblici ---
 
     fun playQueue(items: List<Pair<String, String>>, startIndex: Int) {
         queue = items
@@ -127,6 +187,7 @@ class PlaybackService : Service() {
             RepeatMode.ONE -> RepeatMode.OFF
         }
         mediaPlayer?.isLooping = (repeatMode == RepeatMode.ONE)
+        saveRepeatMode()
     }
 
     private fun playCurrent() {
@@ -152,6 +213,9 @@ class PlaybackService : Service() {
             }
             prepareAsync()
         }
+
+        // Salva l'ultimo brano
+        saveLastTrack()
     }
 
     private fun requestAudioFocus(): Boolean {
@@ -270,8 +334,6 @@ class PlaybackService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // NON fare nulla: il servizio continua a vivere in background.
-        // La musica suona anche se l'app viene chiusa dalle recenti.
         super.onTaskRemoved(rootIntent)
     }
 
@@ -289,5 +351,10 @@ class PlaybackService : Service() {
         const val ACTION_NEXT = "com.example.simpleplayer.NEXT"
         const val ACTION_PREV = "com.example.simpleplayer.PREV"
         const val ACTION_CLOSE = "com.example.simpleplayer.CLOSE"
+
+        private const val PREFS_NAME = "music_player_prefs"
+        private const val KEY_LAST_URI = "last_uri"
+        private const val KEY_LAST_TITLE = "last_title"
+        private const val KEY_REPEAT = "repeat_mode"
     }
 }
