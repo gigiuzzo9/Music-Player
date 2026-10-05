@@ -144,7 +144,6 @@ fun PlaylistTab(service: PlaybackService) {
                 }
             }
 
-            // Pulsante "Aggiungi playlist" allineato a destra
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -542,7 +541,8 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         MediaStore.Audio.Media.ARTIST,
         MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
+            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
