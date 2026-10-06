@@ -1,16 +1,17 @@
 name: Purge Workflow Runs
 on:
-  workflow_dispatch: # Questo ti permette di lanciarlo manualmente dal tab Actions
-
+  workflow_dispatch:
 jobs:
   purge:
     runs-on: ubuntu-latest
     permissions:
-      actions: write # Necessario per poter cancellare i run
+      actions: write
+      contents: read
     steps:
-      - name: Delete all workflow runs
-        uses: iamazeem/delete-workflow-runs-action@v1
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
         with:
-          # 'keep: 1' significa che terrà solo l'ultimo run e cancellerà tutti gli altri.
-          # Se vuoi cancellare proprio tutto, puoi rimuovere questa riga o mettere 'keep: 0'.
-          keep: 1
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 1
