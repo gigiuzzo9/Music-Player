@@ -72,7 +72,7 @@ fun PlayerApp(incomingUri: Uri?) {
         }
 
         val intent = Intent(context, PlaybackService::class.java)
-        // Niente startService: il service parte da solo quando si chiama playQueue
+        context.startService(intent)
         context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
         onDispose {
