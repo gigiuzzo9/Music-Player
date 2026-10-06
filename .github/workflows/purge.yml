@@ -1,0 +1,16 @@
+name: Purge Workflow Runs
+on:
+  workflow_dispatch: # Questo ti permette di lanciarlo manualmente dal tab Actions
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # Necessario per poter cancellare i run
+    steps:
+      - name: Delete all workflow runs
+        uses: iamazeem/delete-workflow-runs-action@v1
+        with:
+          # 'keep: 1' significa che terrà solo l'ultimo run e cancellerà tutti gli altri.
+          # Se vuoi cancellare proprio tutto, puoi rimuovere questa riga o mettere 'keep: 0'.
+          keep: 1
