@@ -327,7 +327,7 @@ class PlaybackService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                startForeground(NOTIFICATION_ID, buildNotification())
+                // Niente startForeground qui: la notifica parte solo in playCurrent()
             }
         }
         return START_STICKY
