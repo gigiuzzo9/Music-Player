@@ -92,8 +92,7 @@ fun FilesTab(service: PlaybackService) {
         return
     }
 
-    // Aspetta che hiddenIds sia caricato
-    val hidden = hiddenIds ?: return  // schermo vuoto finché non è pronto
+    val hidden = hiddenIds ?: return
 
     val visibleFiles = allFiles.filter { it.id !in hidden }
 
@@ -116,7 +115,7 @@ fun FilesTab(service: PlaybackService) {
             ) {
                 Text(file.title)
                 Text(
-                    file.artist,
+                    "${file.artist} · ${formatTime(file.durationMs)}",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -142,6 +141,13 @@ fun FilesTab(service: PlaybackService) {
             }
         )
     }
+}
+
+private fun formatTime(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return "%d:%02d".format(min, sec)
 }
 
 private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
