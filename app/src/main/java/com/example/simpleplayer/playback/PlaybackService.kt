@@ -15,6 +15,7 @@ import android.media.MediaPlayer
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import com.example.simpleplayer.MainActivity
 
@@ -73,8 +74,12 @@ class PlaybackService : Service() {
 
     private fun restoreLastTrack() {
         val savedUri = prefs.getString(KEY_LAST_URI, null) ?: return
-        val savedTitle = prefs.getString(KEY_LAST_TITLE, "Brano") ?: "Brano"
         val savedRepeat = prefs.getString(KEY_REPEAT, "OFF") ?: "OFF"
+
+        // Rileggi il titolo ATTUALE da MediaStore (non usare quello salvato)
+        val savedTitle = getTitleFromMediaStore(savedUri)
+            ?: prefs.getString(KEY_LAST_TITLE, "Brano")
+            ?: "Brano"
 
         repeatMode = when (savedRepeat) {
             "ALL" -> RepeatMode.ALL
@@ -103,6 +108,33 @@ class PlaybackService : Service() {
                 next()
             }
             prepareAsync()
+        }
+
+        // Aggiorna anche il titolo salvato, così la prossima volta è già fresco
+        prefs.edit().putString(KEY_LAST_TITLE, savedTitle).apply()
+    }
+
+    /**
+     * Legge il titolo ATTUALE del file da MediaStore, usando l'URI salvato.
+     * Restituisce null se non riesce a leggerlo.
+     */
+    private fun getTitleFromMediaStore(uriString: String): String? {
+        return try {
+            val uri = android.net.Uri.parse(uriString)
+            val cursor = contentResolver.query(
+                uri,
+                arrayOf(MediaStore.Audio.Media.TITLE),
+                null, null, null
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val title = it.getString(0)
+                    if (!title.isNullOrBlank()) return title
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
         }
     }
 
