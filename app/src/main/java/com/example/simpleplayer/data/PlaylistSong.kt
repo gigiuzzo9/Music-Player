@@ -25,5 +25,6 @@ data class PlaylistSong(
     val title: String,
     val artist: String,
     val uri: String,
+    val path: String?,
     val position: Int
 )
