@@ -25,19 +25,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.simpleplayer.playback.PlaybackService
+import androidx.media3.session.MediaController
 import kotlinx.coroutines.launch
 
 @Composable
-fun PlayerScreen(service: PlaybackService) {
+fun PlayerScreen(controller: MediaController) {
 
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
 
     val headerBackground = if (isSystemInDarkTheme()) {
-        Color(0xFF2F2F2F)   // tema scuro
+        Color(0xFF2F2F2F)
     } else {
-        Color(0xFFE0E0E0)   // tema chiaro
+        Color(0xFFE0E0E0)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -85,8 +85,8 @@ fun PlayerScreen(service: PlaybackService) {
                 .fillMaxWidth()
         ) { page ->
             when (page) {
-                0 -> FilesTab(service = service)
-                1 -> PlaylistTab(service = service)
+                0 -> FilesTab(controller = controller)
+                1 -> PlaylistTab(controller = controller)
                 2 -> HiddenTab()
             }
         }
@@ -102,7 +102,7 @@ fun PlayerScreen(service: PlaybackService) {
                     .fillMaxSize()
                     .padding(bottom = 10.dp)
             ) {
-                PlayerBar(service = service)
+                PlayerBar(controller = controller)
             }
         }
     }
