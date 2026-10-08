@@ -103,7 +103,9 @@ fun FilesTab(service: PlaybackService) {
                     .fillMaxWidth()
                     .combinedClickable(
                         onClick = {
-                            val queue = visibleFiles.map { it.uri.toString() to it.title }
+                            val queue = visibleFiles.map {
+                                Triple(it.uri.toString(), it.title, it.path)
+                            }
                             val index = visibleFiles.indexOf(file).coerceAtLeast(0)
                             service.playQueue(queue, index)
                         },
@@ -156,10 +158,10 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
         MediaStore.Audio.Media.ARTIST,
-        MediaStore.Audio.Media.DURATION
+        MediaStore.Audio.Media.DURATION,
+        MediaStore.Audio.Media.DATA
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
-            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
@@ -173,19 +175,22 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
         val titleCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
         val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
         val durCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+        val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
 
         while (it.moveToNext()) {
             val id = it.getLong(idCol)
             val uri = ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
+            val path = if (dataCol >= 0) it.getString(dataCol) else null
             list.add(
                 AudioFile(
                     id = id,
                     title = it.getString(titleCol) ?: "Sconosciuto",
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
-                    uri = uri
+                    uri = uri,
+                    path = path
                 )
             )
         }
