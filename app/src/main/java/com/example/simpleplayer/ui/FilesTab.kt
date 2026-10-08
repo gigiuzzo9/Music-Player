@@ -5,7 +5,6 @@ import android.content.ContentUris
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -104,13 +103,8 @@ fun FilesTab(service: PlaybackService) {
                     .fillMaxWidth()
                     .combinedClickable(
                         onClick = {
-                            Log.d("PLAYER_CLICK", "--- CLICK ---")
-                            Log.d("PLAYER_CLICK", "Cliccato: ${file.title}")
                             val queue = visibleFiles.map { it.uri.toString() to it.title }
                             val index = visibleFiles.indexOf(file).coerceAtLeast(0)
-                            Log.d("PLAYER_CLICK", "Index calcolato: $index")
-                            Log.d("PLAYER_CLICK", "Queue size: ${queue.size}")
-                            Log.d("PLAYER_CLICK", "In coda andrà: ${queue.getOrNull(index)?.second}")
                             service.playQueue(queue, index)
                         },
                         onLongClick = {
