@@ -1,12 +1,7 @@
 package com.example.simpleplayer
 
 import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
-import android.net.Uri
 import android.os.Bundle
-import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,22 +9,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.example.simpleplayer.playback.PlaybackService
+import androidx.media3.common.MediaItem
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import com.example.simpleplayer.ui.PlayerScreen
 import com.example.simpleplayer.ui.theme.SimplePlayerTheme
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val incomingUri: Uri? = intent?.data
 
         setContent {
             SimplePlayerTheme {
@@ -37,7 +35,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    PlayerApp(incomingUri = incomingUri)
+                    PlayerApp()
                 }
             }
         }
@@ -45,39 +43,35 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PlayerApp(incomingUri: Uri?) {
+fun PlayerApp() {
     val context = LocalContext.current
-    var service by remember { mutableStateOf<PlaybackService?>(null) }
+    var controller by remember { mutableStateOf<MediaController?>(null) }
 
+    // Connessione al PlaybackService tramite MediaController
     DisposableEffect(Unit) {
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                val localBinder = binder as PlaybackService.LocalBinder
-                service = localBinder.getService()
+        val token = SessionToken(
+            context,
+            ComponentName(context, com.example.simpleplayer.playback.PlaybackService::class.java)
+        )
+        val future: ListenableFuture<MediaController> =
+            MediaController.Builder(context, token).buildAsync()
 
-                if (incomingUri != null) {
-                    val title = incomingUri.lastPathSegment ?: "Brano"
-                    service?.playQueue(
-                        listOf(Triple(incomingUri.toString(), title, null)),
-                        0
-                    )
-                }
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {
-                service = null
-            }
-        }
-
-        val intent = Intent(context, PlaybackService::class.java)
-        context.startService(intent)
-        context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        future.addListener(
+            { controller = future.get() },
+            MoreExecutors.directExecutor()
+        )
 
         onDispose {
-            context.unbindService(connection)
+            controller?.release()
+            controller = null
+            MediaController.releaseFuture(future)
         }
     }
 
-    val s = service ?: return
-    PlayerScreen(service = s)
+    val c = controller
+    if (c == null) {
+        return
+    }
+
+    PlayerScreen(controller = c)
 }
