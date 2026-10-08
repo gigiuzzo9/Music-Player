@@ -50,4 +50,7 @@ dependencies {
 
     // Guava (serve per ListenableFuture del MediaController)
     implementation("com.google.guava:guava:33.0.0-android")
+
+    // Libreria per drag & drop nelle liste (Ordina brani)
+    implementation("sh.calvin.reorderable:reorderable:2.3.0")
 }
