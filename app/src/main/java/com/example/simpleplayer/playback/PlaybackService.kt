@@ -37,7 +37,6 @@ class PlaybackService : Service() {
 
     private lateinit var prefs: SharedPreferences
 
-    // Stato per debug: l'ultimo errore del player
     private var lastError: String = ""
 
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
@@ -89,9 +88,6 @@ class PlaybackService : Service() {
 
         queue = listOf(savedUri to savedTitle)
         currentIndex = 0
-
-        // Non prepara niente. Aspetta il play.
-        // (La preparazione avverrà in playCurrent(), al primo click)
     }
 
     private fun getTitleFromMediaStore(uriString: String): String? {
@@ -139,10 +135,7 @@ class PlaybackService : Service() {
             if (mp.isPlaying) {
                 mp.pause()
             } else {
-                if (requestAudioFocus()) {
-                    // Se il player era in stato di "preparato", start() funziona
-                    mp.start()
-                }
+                if (requestAudioFocus()) mp.start()
             }
         } catch (e: Exception) {
             Log.e("PLAYER", "togglePlayPause errore: ${e.message}")
@@ -172,7 +165,6 @@ class PlaybackService : Service() {
     } catch (e: Exception) { false }
 
     fun currentTitle(): String {
-        // Se c'è un errore, mostralo
         if (lastError.isNotEmpty()) return "⚠ $lastError"
         return queue.getOrNull(currentIndex)?.second ?: "Nessun brano"
     }
@@ -231,7 +223,8 @@ class PlaybackService : Service() {
             )
             mp.isLooping = (repeatMode == RepeatMode.ONE)
 
-            mp.setDataSource(item.first)
+            // FIX: usa Context + Uri, NON la stringa
+            mp.setDataSource(this@PlaybackService, android.net.Uri.parse(item.first))
             Log.d("PLAYER", "DataSource impostato: ${item.first}")
 
             mp.setOnErrorListener { _, what, extra ->
@@ -250,6 +243,7 @@ class PlaybackService : Service() {
                 } catch (e: Exception) {
                     lastError = "Start: ${e.message}"
                     Log.e("PLAYER", "Errore su start: ${e.message}")
+                    updateNotification()
                 }
             }
 
@@ -257,13 +251,13 @@ class PlaybackService : Service() {
                 next()
             }
 
-            // prepareAsync: non blocca il thread
             mp.prepareAsync()
             Log.d("PLAYER", "prepareAsync chiamato per: ${item.second}")
 
         } catch (e: Exception) {
             lastError = "Prep: ${e.message}"
             Log.e("PLAYER", "Errore in playCurrent: ${e.message}")
+            updateNotification()
         }
 
         saveLastTrack()
