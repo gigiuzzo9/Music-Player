@@ -14,7 +14,7 @@ android {
         applicationId = "com.example.simpleplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
     }
 
@@ -44,9 +44,10 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
 
-    // MediaStyle per la notifica
-    implementation("androidx.media:media:1.7.0")
+    // Media3 ExoPlayer
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-session:1.4.1")
 
-    // Libreria per drag & drop nelle liste
-    implementation("sh.calvin.reorderable:reorderable:2.3.0")
+    // Guava (serve per ListenableFuture del MediaController)
+    implementation("com.google.guava:guava:33.0.0-android")
 }
