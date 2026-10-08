@@ -6,9 +6,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -39,6 +42,8 @@ fun PlayerScreen(controller: MediaController) {
     } else {
         Color(0xFFE0E0E0)
     }
+
+    val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -91,14 +96,23 @@ fun PlayerScreen(controller: MediaController) {
             }
         }
 
-        // Player: sfondo grigio fino al bordo inferiore, contenuto attaccato
-        Column(
+        // Contenitore player: sfondo grigio che riempie tutto,
+        // ma il contenuto è alzato SOPRA la barra nera di Android
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.35f)
                 .background(headerBackground)
         ) {
-            PlayerBar(controller = controller)
+            // padding inferiore = altezza barra Android
+            // così il contenuto non finisce sotto i pulsanti
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = navBarPadding)
+            ) {
+                PlayerBar(controller = controller)
+            }
         }
     }
 }
