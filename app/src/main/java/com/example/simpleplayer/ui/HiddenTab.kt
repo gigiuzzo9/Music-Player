@@ -87,7 +87,6 @@ fun HiddenTab() {
         return
     }
 
-    // Mostra solo i file che sono nella lista hidden
     val hiddenFiles = allFiles.filter { it.id in hiddenIds }
 
     if (hiddenFiles.isEmpty()) {
@@ -109,7 +108,7 @@ fun HiddenTab() {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(file.title)
                     Text(
-                        file.artist,
+                        "${file.artist} · ${formatTime(file.durationMs)}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -124,13 +123,21 @@ fun HiddenTab() {
     }
 }
 
+private fun formatTime(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return "%d:%02d".format(min, sec)
+}
+
 private fun queryAudioFiles(context: Context): List<AudioFile> {
     val list = mutableListOf<AudioFile>()
     val projection = arrayOf(
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
         MediaStore.Audio.Media.ARTIST,
-        MediaStore.Audio.Media.DURATION
+        MediaStore.Audio.Media.DURATION,
+        MediaStore.Audio.Media.DATA
     )
     val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
     val cursor = context.contentResolver.query(
@@ -146,19 +153,22 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         val titleCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
         val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
         val durCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+        val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
 
         while (it.moveToNext()) {
             val id = it.getLong(idCol)
             val uri = ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
+            val path = if (dataCol >= 0) it.getString(dataCol) else null
             list.add(
                 AudioFile(
                     id = id,
                     title = it.getString(titleCol) ?: "Sconosciuto",
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
-                    uri = uri
+                    uri = uri,
+                    path = path
                 )
             )
         }
