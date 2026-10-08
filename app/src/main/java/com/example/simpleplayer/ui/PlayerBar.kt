@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.example.simpleplayer.ui
 
 import androidx.compose.foundation.Image
@@ -28,9 +26,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,46 +42,83 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
 import com.example.simpleplayer.R
-import com.example.simpleplayer.playback.PlaybackService
-import com.example.simpleplayer.playback.RepeatMode
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerBar(service: PlaybackService) {
+fun PlayerBar(controller: MediaController) {
 
-    var isPlaying by remember { mutableStateOf(service.isPlayingNow()) }
-    var title by remember { mutableStateOf(service.currentTitle()) }
+    var isPlaying by remember { mutableStateOf(controller.isPlaying) }
+    var title by remember { mutableStateOf("") }
+    var artist by remember { mutableStateOf("") }
     var duration by remember { mutableLongStateOf(0L) }
     var position by remember { mutableLongStateOf(0L) }
     var isUserDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableFloatStateOf(0f) }
-    var repeatMode by remember { mutableStateOf(service.getRepeatMode()) }
+    var repeatMode by remember { mutableIntStateOf(controller.repeatMode) }
 
-    LaunchedEffect(service) {
-        while (true) {
-            isPlaying = service.isPlayingNow()
-            title = service.currentTitle()
-            if (!isUserDragging) {
-                position = service.getPosition()
+    // Ascolta il player
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
             }
-            duration = service.getDuration()
-            repeatMode = service.getRepeatMode()
+
+            override fun onRepeatModeChanged(mode: Int) {
+                repeatMode = mode
+            }
+
+            override fun onMediaMetadataChanged(metadata: MediaMetadata) {
+                title = metadata.title?.toString() ?: ""
+                artist = metadata.artist?.toString() ?: ""
+            }
+
+            override fun onMediaItemTransition(
+                mediaItem: androidx.media3.common.MediaItem?,
+                reason: Int
+            ) {
+                val md = mediaItem?.mediaMetadata
+                title = md?.title?.toString() ?: ""
+                artist = md?.artist?.toString() ?: ""
+                position = 0L
+                duration = controller.duration.coerceAtLeast(0L)
+            }
+        }
+        controller.addListener(listener)
+
+        // Imposta i valori iniziali
+        val md = controller.currentMediaItem?.mediaMetadata
+        title = md?.title?.toString() ?: ""
+        artist = md?.artist?.toString() ?: ""
+        duration = controller.duration.coerceAtLeast(0L)
+        repeatMode = controller.repeatMode
+
+        onDispose { controller.removeListener(listener) }
+    }
+
+    // Aggiorna posizione e durata ogni 500 ms
+    LaunchedEffect(controller) {
+        while (true) {
+            if (!isUserDragging) {
+                position = controller.currentPosition.coerceAtLeast(0L)
+            }
+            duration = controller.duration.coerceAtLeast(0L)
             delay(500)
         }
     }
 
     val repeatOffColor = Color(0xFF888888)
     val repeatOnColor = Color(0xFF1DB954)
-    val repeatTint = when (repeatMode) {
-        RepeatMode.OFF -> repeatOffColor
-        else -> repeatOnColor
-    }
+    val repeatTint = if (repeatMode == Player.REPEAT_MODE_OFF) repeatOffColor else repeatOnColor
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-         
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -89,6 +126,12 @@ fun PlayerBar(service: PlaybackService) {
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            artist,
+            style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -101,7 +144,11 @@ fun PlayerBar(service: PlaybackService) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { service.skipBy(-10_000L) },
+                onClick = {
+                    val newPos = (controller.currentPosition - 10_000L)
+                        .coerceIn(0L, controller.duration.coerceAtLeast(0L))
+                    controller.seekTo(newPos)
+                },
                 modifier = Modifier.size(40.dp)
             ) {
                 Image(
@@ -123,7 +170,7 @@ fun PlayerBar(service: PlaybackService) {
                     dragPosition = it
                 },
                 onValueChangeFinished = {
-                    service.seekTo(dragPosition.toLong())
+                    controller.seekTo(dragPosition.toLong())
                     position = dragPosition.toLong()
                     isUserDragging = false
                 },
@@ -158,7 +205,11 @@ fun PlayerBar(service: PlaybackService) {
             )
 
             IconButton(
-                onClick = { service.skipBy(10_000L) },
+                onClick = {
+                    val newPos = (controller.currentPosition + 10_000L)
+                        .coerceIn(0L, controller.duration.coerceAtLeast(0L))
+                    controller.seekTo(newPos)
+                },
                 modifier = Modifier.size(40.dp)
             ) {
                 Image(
@@ -177,7 +228,11 @@ fun PlayerBar(service: PlaybackService) {
         ) {
 
             IconButton(
-                onClick = { service.previous() },
+                onClick = {
+                    if (controller.hasPreviousMediaItem()) {
+                        controller.seekToPreviousMediaItem()
+                    }
+                },
                 modifier = Modifier.size(56.dp)
             ) {
                 Icon(
@@ -188,7 +243,9 @@ fun PlayerBar(service: PlaybackService) {
             }
 
             IconButton(
-                onClick = { service.togglePlayPause() },
+                onClick = {
+                    if (controller.isPlaying) controller.pause() else controller.play()
+                },
                 modifier = Modifier.size(72.dp)
             ) {
                 Icon(
@@ -199,7 +256,11 @@ fun PlayerBar(service: PlaybackService) {
             }
 
             IconButton(
-                onClick = { service.next() },
+                onClick = {
+                    if (controller.hasNextMediaItem()) {
+                        controller.seekToNextMediaItem()
+                    }
+                },
                 modifier = Modifier.size(56.dp)
             ) {
                 Icon(
@@ -210,11 +271,18 @@ fun PlayerBar(service: PlaybackService) {
             }
 
             IconButton(
-                onClick = { service.cycleRepeatMode() },
+                onClick = {
+                    val next = when (controller.repeatMode) {
+                        Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                        Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                        else -> Player.REPEAT_MODE_OFF
+                    }
+                    controller.repeatMode = next
+                },
                 modifier = Modifier.size(56.dp)
             ) {
                 Icon(
-                    imageVector = if (repeatMode == RepeatMode.ONE)
+                    imageVector = if (repeatMode == Player.REPEAT_MODE_ONE)
                         Icons.Filled.RepeatOne
                     else
                         Icons.Filled.Repeat,
