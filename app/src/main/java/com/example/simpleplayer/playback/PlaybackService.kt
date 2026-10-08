@@ -66,17 +66,13 @@ class PlaybackService : Service() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Ripristina l'ultimo brano salvato
         restoreLastTrack()
     }
-
-    // --- Ripristino stato ---
 
     private fun restoreLastTrack() {
         val savedUri = prefs.getString(KEY_LAST_URI, null) ?: return
         val savedRepeat = prefs.getString(KEY_REPEAT, "OFF") ?: "OFF"
 
-        // Rileggi il titolo ATTUALE da MediaStore (non usare quello salvato)
         val savedTitle = getTitleFromMediaStore(savedUri)
             ?: prefs.getString(KEY_LAST_TITLE, "Brano")
             ?: "Brano"
@@ -90,7 +86,6 @@ class PlaybackService : Service() {
         queue = listOf(savedUri to savedTitle)
         currentIndex = 0
 
-        // Prepara il brano in pausa (senza play, senza focus)
         mediaPlayer?.release()
         mediaPlayer = MediaPlayer().apply {
             setAudioAttributes(
@@ -110,14 +105,9 @@ class PlaybackService : Service() {
             prepareAsync()
         }
 
-        // Aggiorna anche il titolo salvato, così la prossima volta è già fresco
         prefs.edit().putString(KEY_LAST_TITLE, savedTitle).apply()
     }
 
-    /**
-     * Legge il titolo ATTUALE del file da MediaStore, usando l'URI salvato.
-     * Restituisce null se non riesce a leggerlo.
-     */
     private fun getTitleFromMediaStore(uriString: String): String? {
         return try {
             val uri = android.net.Uri.parse(uriString)
@@ -152,12 +142,11 @@ class PlaybackService : Service() {
             .apply()
     }
 
-    // --- Controlli pubblici ---
-
     fun playQueue(items: List<Pair<String, String>>, startIndex: Int) {
         queue = items
         currentIndex = startIndex
-        if (requestAudioFocus()) playCurrent()
+        requestAudioFocus()  // prova a ottenere il focus, ma non bloccare se fallisce
+        playCurrent()
     }
 
     fun togglePlayPause() {
@@ -246,7 +235,6 @@ class PlaybackService : Service() {
             prepareAsync()
         }
 
-        // Salva l'ultimo brano
         saveLastTrack()
     }
 
