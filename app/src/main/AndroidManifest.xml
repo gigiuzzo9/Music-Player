@@ -23,7 +23,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Per "Apri con" sui file audio -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -34,6 +33,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Service gestito da Media3 -->
         <service
             android:name=".playback.PlaybackService"
             android:foregroundServiceType="mediaPlayback"
