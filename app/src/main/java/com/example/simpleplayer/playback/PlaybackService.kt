@@ -16,6 +16,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.simpleplayer.MainActivity
 
@@ -36,22 +37,21 @@ class PlaybackService : Service() {
 
     private lateinit var prefs: SharedPreferences
 
+    // Stato per debug: l'ultimo errore del player
+    private var lastError: String = ""
+
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
             AudioManager.AUDIOFOCUS_LOSS,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 mediaPlayer?.let {
-                    try {
-                        if (it.isPlaying) it.pause()
-                    } catch (e: Exception) { }
+                    try { if (it.isPlaying) it.pause() } catch (e: Exception) { }
                     updateNotification()
                 }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 mediaPlayer?.let {
-                    try {
-                        it.start()
-                    } catch (e: Exception) { }
+                    try { it.start() } catch (e: Exception) { }
                     updateNotification()
                 }
             }
@@ -69,16 +69,6 @@ class PlaybackService : Service() {
         createNotificationChannel()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-        // Crea il player UNA VOLTA SOLA e riutilizzalo sempre
-        mediaPlayer = MediaPlayer().apply {
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-        }
 
         restoreLastTrack()
     }
@@ -100,29 +90,8 @@ class PlaybackService : Service() {
         queue = listOf(savedUri to savedTitle)
         currentIndex = 0
 
-        // Non parte. Resta pronto in pausa.
-        try {
-            mediaPlayer?.reset()
-            mediaPlayer?.setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            mediaPlayer?.isLooping = (repeatMode == RepeatMode.ONE)
-            mediaPlayer?.setDataSource(savedUri)
-            mediaPlayer?.setOnPreparedListener {
-                // NON parte da solo
-            }
-            mediaPlayer?.setOnCompletionListener {
-                next()
-            }
-            mediaPlayer?.prepareAsync()
-        } catch (e: Exception) {
-            // Se fallisce, ignora: il player si ripreparerà al play
-        }
-
-        prefs.edit().putString(KEY_LAST_TITLE, savedTitle).apply()
+        // Non prepara niente. Aspetta il play.
+        // (La preparazione avverrà in playCurrent(), al primo click)
     }
 
     private fun getTitleFromMediaStore(uriString: String): String? {
@@ -140,9 +109,7 @@ class PlaybackService : Service() {
                 }
             }
             null
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
     private fun saveLastTrack() {
@@ -172,9 +139,14 @@ class PlaybackService : Service() {
             if (mp.isPlaying) {
                 mp.pause()
             } else {
-                if (requestAudioFocus()) mp.start()
+                if (requestAudioFocus()) {
+                    // Se il player era in stato di "preparato", start() funziona
+                    mp.start()
+                }
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            Log.e("PLAYER", "togglePlayPause errore: ${e.message}")
+        }
         updateNotification()
     }
 
@@ -199,8 +171,11 @@ class PlaybackService : Service() {
         mediaPlayer?.isPlaying == true
     } catch (e: Exception) { false }
 
-    fun currentTitle(): String =
-        queue.getOrNull(currentIndex)?.second ?: "Nessun brano"
+    fun currentTitle(): String {
+        // Se c'è un errore, mostralo
+        if (lastError.isNotEmpty()) return "⚠ $lastError"
+        return queue.getOrNull(currentIndex)?.second ?: "Nessun brano"
+    }
 
     fun getPosition(): Long = try {
         mediaPlayer?.currentPosition?.toLong() ?: 0L
@@ -211,9 +186,7 @@ class PlaybackService : Service() {
     } catch (e: Exception) { 0L }
 
     fun seekTo(ms: Long) {
-        try {
-            mediaPlayer?.seekTo(ms.toInt())
-        } catch (e: Exception) { }
+        try { mediaPlayer?.seekTo(ms.toInt()) } catch (e: Exception) { }
     }
 
     fun skipBy(ms: Long) {
@@ -232,20 +205,24 @@ class PlaybackService : Service() {
             RepeatMode.ALL -> RepeatMode.ONE
             RepeatMode.ONE -> RepeatMode.OFF
         }
-        try {
-            mediaPlayer?.isLooping = (repeatMode == RepeatMode.ONE)
-        } catch (e: Exception) { }
+        try { mediaPlayer?.isLooping = (repeatMode == RepeatMode.ONE) } catch (e: Exception) { }
         saveRepeatMode()
     }
 
     private fun playCurrent() {
         val item = queue.getOrNull(currentIndex) ?: return
+        lastError = ""
 
-        val mp = mediaPlayer ?: return
+        // Distruggi SEMPRE il player vecchio e creane uno nuovo
+        try {
+            mediaPlayer?.release()
+        } catch (e: Exception) { }
+        mediaPlayer = null
+
+        val mp = MediaPlayer()
+        mediaPlayer = mp
 
         try {
-            // Reset e riconfigura il player ESISTENTE
-            mp.reset()
             mp.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -254,12 +231,13 @@ class PlaybackService : Service() {
             )
             mp.isLooping = (repeatMode == RepeatMode.ONE)
 
-            // MODIFICA 1: passa la stringa URI direttamente (non Context + Uri)
             mp.setDataSource(item.first)
+            Log.d("PLAYER", "DataSource impostato: ${item.first}")
 
-            // MODIFICA 2: listener di errore, per sapere se qualcosa va storto
             mp.setOnErrorListener { _, what, extra ->
-                android.util.Log.e("PLAYER", "Errore MediaPlayer: what=$what extra=$extra")
+                lastError = "Errore $what/$extra"
+                Log.e("PLAYER", "Errore MediaPlayer: what=$what extra=$extra")
+                updateNotification()
                 true
             }
 
@@ -268,8 +246,10 @@ class PlaybackService : Service() {
                     it.start()
                     updateNotification()
                     startForeground(NOTIFICATION_ID, buildNotification())
+                    Log.d("PLAYER", "Play partito: ${item.second}")
                 } catch (e: Exception) {
-                    android.util.Log.e("PLAYER", "Errore su start(): ${e.message}")
+                    lastError = "Start: ${e.message}"
+                    Log.e("PLAYER", "Errore su start: ${e.message}")
                 }
             }
 
@@ -277,37 +257,13 @@ class PlaybackService : Service() {
                 next()
             }
 
-            // MODIFICA 4: prepare() sincrono invece di prepareAsync()
-            mp.prepare()
+            // prepareAsync: non blocca il thread
+            mp.prepareAsync()
+            Log.d("PLAYER", "prepareAsync chiamato per: ${item.second}")
 
         } catch (e: Exception) {
-            android.util.Log.e("PLAYER", "Errore in playCurrent: ${e.message}")
-
-            // Se qualcosa è andato storto, distruggi e ricrea il player
-            try {
-                mp.release()
-            } catch (ex: Exception) { }
-
-            mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                try {
-                    setDataSource(item.first)
-                    setOnPreparedListener {
-                        it.start()
-                        updateNotification()
-                        startForeground(NOTIFICATION_ID, buildNotification())
-                    }
-                    setOnCompletionListener { next() }
-                    prepare()
-                } catch (ex: Exception) {
-                    android.util.Log.e("PLAYER", "Errore anche con il nuovo player: ${ex.message}")
-                }
-            }
+            lastError = "Prep: ${e.message}"
+            Log.e("PLAYER", "Errore in playCurrent: ${e.message}")
         }
 
         saveLastTrack()
@@ -348,9 +304,7 @@ class PlaybackService : Service() {
     }
 
     private fun stopAndClose() {
-        try {
-            mediaPlayer?.release()
-        } catch (e: Exception) { }
+        try { mediaPlayer?.release() } catch (e: Exception) { }
         mediaPlayer = null
         abandonAudioFocus()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -388,9 +342,7 @@ class PlaybackService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
-        val isPlaying = try {
-            mediaPlayer?.isPlaying == true
-        } catch (e: Exception) { false }
+        val isPlaying = try { mediaPlayer?.isPlaying == true } catch (e: Exception) { false }
 
         val playPauseIcon = if (isPlaying)
             android.R.drawable.ic_media_pause
@@ -428,9 +380,7 @@ class PlaybackService : Service() {
                 stopAndClose()
                 return START_NOT_STICKY
             }
-            else -> {
-                // Niente startForeground qui
-            }
+            else -> { }
         }
         return START_STICKY
     }
@@ -440,9 +390,7 @@ class PlaybackService : Service() {
     }
 
     override fun onDestroy() {
-        try {
-            mediaPlayer?.release()
-        } catch (e: Exception) { }
+        try { mediaPlayer?.release() } catch (e: Exception) { }
         mediaPlayer = null
         abandonAudioFocus()
         super.onDestroy()
