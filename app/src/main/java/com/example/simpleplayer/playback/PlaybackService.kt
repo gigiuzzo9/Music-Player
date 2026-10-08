@@ -145,7 +145,7 @@ class PlaybackService : Service() {
     fun playQueue(items: List<Pair<String, String>>, startIndex: Int) {
         queue = items
         currentIndex = startIndex
-        requestAudioFocus()  // prova a ottenere il focus, ma non bloccare se fallisce
+        requestAudioFocus()
         playCurrent()
     }
 
@@ -214,8 +214,19 @@ class PlaybackService : Service() {
     private fun playCurrent() {
         val item = queue.getOrNull(currentIndex) ?: return
 
-        mediaPlayer?.release()
-        mediaPlayer = MediaPlayer().apply {
+        // Usa reset() invece di release() per evitare problemi di timing
+        if (mediaPlayer == null) {
+            mediaPlayer = MediaPlayer()
+        } else {
+            try {
+                mediaPlayer?.reset()
+            } catch (e: Exception) {
+                mediaPlayer?.release()
+                mediaPlayer = MediaPlayer()
+            }
+        }
+
+        mediaPlayer?.apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
