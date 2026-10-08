@@ -91,19 +91,14 @@ fun PlayerScreen(controller: MediaController) {
             }
         }
 
+        // Player: sfondo grigio fino al bordo inferiore, contenuto attaccato
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.35f)
                 .background(headerBackground)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 10.dp)
-            ) {
-                PlayerBar(controller = controller)
-            }
+            PlayerBar(controller = controller)
         }
     }
 }
