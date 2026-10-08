@@ -27,7 +27,8 @@ class PlaybackService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private val binder = LocalBinder()
 
-    private var queue: List<Pair<String, String>> = emptyList()
+    // Coda: (uri, titolo, path)
+    private var queue: List<Triple<String, String, String?>> = emptyList()
     private var currentIndex = 0
 
     private var repeatMode = RepeatMode.OFF
@@ -74,6 +75,7 @@ class PlaybackService : Service() {
 
     private fun restoreLastTrack() {
         val savedUri = prefs.getString(KEY_LAST_URI, null) ?: return
+        val savedPath = prefs.getString(KEY_LAST_PATH, null)
         val savedRepeat = prefs.getString(KEY_REPEAT, "OFF") ?: "OFF"
 
         val savedTitle = getTitleFromMediaStore(savedUri)
@@ -86,7 +88,7 @@ class PlaybackService : Service() {
             else -> RepeatMode.OFF
         }
 
-        queue = listOf(savedUri to savedTitle)
+        queue = listOf(Triple(savedUri, savedTitle, savedPath))
         currentIndex = 0
     }
 
@@ -113,6 +115,7 @@ class PlaybackService : Service() {
         prefs.edit()
             .putString(KEY_LAST_URI, item.first)
             .putString(KEY_LAST_TITLE, item.second)
+            .putString(KEY_LAST_PATH, item.third)
             .apply()
     }
 
@@ -122,7 +125,7 @@ class PlaybackService : Service() {
             .apply()
     }
 
-    fun playQueue(items: List<Pair<String, String>>, startIndex: Int) {
+    fun playQueue(items: List<Triple<String, String, String?>>, startIndex: Int) {
         queue = items
         currentIndex = startIndex
         requestAudioFocus()
@@ -223,9 +226,15 @@ class PlaybackService : Service() {
             )
             mp.isLooping = (repeatMode == RepeatMode.ONE)
 
-            // FIX: usa Context + Uri, NON la stringa
-            mp.setDataSource(this@PlaybackService, android.net.Uri.parse(item.first))
-            Log.d("PLAYER", "DataSource impostato: ${item.first}")
+            // MODIFICA: usa il path se c'è, altrimenti l'URI
+            val path = item.third
+            if (!path.isNullOrBlank()) {
+                mp.setDataSource(path)
+                Log.d("PLAYER", "DataSource (path): $path")
+            } else {
+                mp.setDataSource(this@PlaybackService, android.net.Uri.parse(item.first))
+                Log.d("PLAYER", "DataSource (uri): ${item.first}")
+            }
 
             mp.setOnErrorListener { _, what, extra ->
                 lastError = "Errore $what/$extra"
@@ -401,6 +410,7 @@ class PlaybackService : Service() {
         private const val PREFS_NAME = "music_player_prefs"
         private const val KEY_LAST_URI = "last_uri"
         private const val KEY_LAST_TITLE = "last_title"
+        private const val KEY_LAST_PATH = "last_path"
         private const val KEY_REPEAT = "repeat_mode"
     }
 }
