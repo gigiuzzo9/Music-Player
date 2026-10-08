@@ -29,7 +29,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Leggi l'URI ricevuto da "Apri con"
         val incomingUri: Uri? = intent?.data
 
         setContent {
@@ -56,11 +55,10 @@ fun PlayerApp(incomingUri: Uri?) {
                 val localBinder = binder as PlaybackService.LocalBinder
                 service = localBinder.getService()
 
-                // Se è arrivato un URI da "Apri con", riproducilo
                 if (incomingUri != null) {
                     val title = incomingUri.lastPathSegment ?: "Brano"
                     service?.playQueue(
-                        listOf(incomingUri.toString() to title),
+                        listOf(Triple(incomingUri.toString(), title, null)),
                         0
                     )
                 }
