@@ -51,17 +51,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
 import com.example.simpleplayer.data.Playlist
 import com.example.simpleplayer.data.PlaylistSong
 import com.example.simpleplayer.model.AudioFile
-import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
-fun PlaylistTab(service: PlaybackService) {
+fun PlaylistTab(controller: MediaController) {
 
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
@@ -177,10 +179,21 @@ fun PlaylistTab(service: PlaybackService) {
                         scope.launch {
                             val songs = dao.getSongs(playlist.id)
                             if (songs.isNotEmpty()) {
-                                val queue = songs.map {
-                                    Triple(it.uri, it.title, it.path)
+                                val items = songs.map { s ->
+                                    MediaItem.Builder()
+                                        .setUri(s.uri)
+                                        .setMediaId(s.mediaId.toString())
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(s.title)
+                                                .setArtist(s.artist)
+                                                .build()
+                                        )
+                                        .build()
                                 }
-                                service.playQueue(queue, 0)
+                                controller.setMediaItems(items, 0, 0L)
+                                controller.prepare()
+                                controller.play()
                             }
                         }
                     }) { Text("Riproduci") }
@@ -356,10 +369,21 @@ fun PlaylistTab(service: PlaybackService) {
                                             .clickable {
                                                 if (!deletingMode) {
                                                     val index = openedSongs.indexOf(song)
-                                                    val queue = openedSongs.map {
-                                                        Triple(it.uri, it.title, it.path)
+                                                    val items = openedSongs.map { s ->
+                                                        MediaItem.Builder()
+                                                            .setUri(s.uri)
+                                                            .setMediaId(s.mediaId.toString())
+                                                            .setMediaMetadata(
+                                                                MediaMetadata.Builder()
+                                                                    .setTitle(s.title)
+                                                                    .setArtist(s.artist)
+                                                                    .build()
+                                                            )
+                                                            .build()
                                                     }
-                                                    service.playQueue(queue, index)
+                                                    controller.setMediaItems(items, index, 0L)
+                                                    controller.prepare()
+                                                    controller.play()
                                                 }
                                             }
                                     ) {
@@ -506,7 +530,7 @@ fun PlaylistTab(service: PlaybackService) {
                                 title = f.title,
                                 artist = f.artist,
                                 uri = f.uri.toString(),
-                                path = f.path,
+                                path = null,
                                 position = 0
                             )
                         }
@@ -544,10 +568,10 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
         MediaStore.Audio.Media.ARTIST,
-        MediaStore.Audio.Media.DURATION,
-        MediaStore.Audio.Media.DATA
+        MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
+            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
@@ -561,14 +585,12 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         val titleCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
         val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
         val durCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-        val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
 
         while (it.moveToNext()) {
             val id = it.getLong(idCol)
             val uri = ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
-            val path = if (dataCol >= 0) it.getString(dataCol) else null
             list.add(
                 AudioFile(
                     id = id,
@@ -576,7 +598,7 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
                     uri = uri,
-                    path = path
+                    path = null
                 )
             )
         }
