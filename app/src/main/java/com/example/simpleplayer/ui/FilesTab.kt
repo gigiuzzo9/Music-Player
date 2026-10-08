@@ -32,15 +32,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
 import com.example.simpleplayer.data.HiddenFile
 import com.example.simpleplayer.model.AudioFile
-import com.example.simpleplayer.playback.PlaybackService
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FilesTab(service: PlaybackService) {
+fun FilesTab(controller: MediaController) {
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
     val dao = app.database.playlistDao()
@@ -103,11 +105,22 @@ fun FilesTab(service: PlaybackService) {
                     .fillMaxWidth()
                     .combinedClickable(
                         onClick = {
-                            val queue = visibleFiles.map {
-                                Triple(it.uri.toString(), it.title, it.path)
+                            val items = visibleFiles.map { f ->
+                                MediaItem.Builder()
+                                    .setUri(f.uri)
+                                    .setMediaId(f.id.toString())
+                                    .setMediaMetadata(
+                                        MediaMetadata.Builder()
+                                            .setTitle(f.title)
+                                            .setArtist(f.artist)
+                                            .build()
+                                    )
+                                    .build()
                             }
                             val index = visibleFiles.indexOf(file).coerceAtLeast(0)
-                            service.playQueue(queue, index)
+                            controller.setMediaItems(items, index, 0L)
+                            controller.prepare()
+                            controller.play()
                         },
                         onLongClick = {
                             contextFile = file
@@ -158,10 +171,10 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
         MediaStore.Audio.Media.ARTIST,
-        MediaStore.Audio.Media.DURATION,
-        MediaStore.Audio.Media.DATA
+        MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
+            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
@@ -175,14 +188,12 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
         val titleCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
         val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
         val durCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-        val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
 
         while (it.moveToNext()) {
             val id = it.getLong(idCol)
             val uri = ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
-            val path = if (dataCol >= 0) it.getString(dataCol) else null
             list.add(
                 AudioFile(
                     id = id,
@@ -190,7 +201,7 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
                     uri = uri,
-                    path = path
+                    path = null
                 )
             )
         }
