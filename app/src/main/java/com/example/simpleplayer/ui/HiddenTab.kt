@@ -136,10 +136,10 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
         MediaStore.Audio.Media.ARTIST,
-        MediaStore.Audio.Media.DURATION,
-        MediaStore.Audio.Media.DATA
+        MediaStore.Audio.Media.DURATION
     )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
+            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
     val cursor = context.contentResolver.query(
         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
         projection,
@@ -153,14 +153,12 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
         val titleCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
         val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
         val durCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-        val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
 
         while (it.moveToNext()) {
             val id = it.getLong(idCol)
             val uri = ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
-            val path = if (dataCol >= 0) it.getString(dataCol) else null
             list.add(
                 AudioFile(
                     id = id,
@@ -168,7 +166,7 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
                     uri = uri,
-                    path = path
+                    path = null
                 )
             )
         }
