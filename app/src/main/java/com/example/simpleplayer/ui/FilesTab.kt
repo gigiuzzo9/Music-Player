@@ -45,17 +45,14 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FilesTab(controller: MediaController) {
+fun FilesTab(controller: MediaController?) {
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
     val dao = app.database.playlistDao()
     val cachedDao = app.database.cachedFileDao()
     val scope = rememberCoroutineScope()
 
-    // Lista dalla cache (istantanea)
     val cachedFiles by cachedDao.observeAll().collectAsState(initial = emptyList())
-
-    // Nascosti
     val hiddenIds by dao.observeHiddenIds().collectAsState(initial = null)
 
     var hasPermission by remember {
@@ -87,7 +84,6 @@ fun FilesTab(controller: MediaController) {
         }
     }
 
-    // Aggiornamento in background: silenzioso, senza popup
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             withContext(Dispatchers.IO) {
@@ -118,6 +114,7 @@ fun FilesTab(controller: MediaController) {
                     .fillMaxWidth()
                     .combinedClickable(
                         onClick = {
+                            val c = controller ?: return@combinedClickable
                             val items = visibleFiles.map { f ->
                                 MediaItem.Builder()
                                     .setUri(f.uri)
@@ -131,9 +128,9 @@ fun FilesTab(controller: MediaController) {
                                     .build()
                             }
                             val index = visibleFiles.indexOf(cached).coerceAtLeast(0)
-                            controller.setMediaItems(items, index, 0L)
-                            controller.prepare()
-                            controller.play()
+                            c.setMediaItems(items, index, 0L)
+                            c.prepare()
+                            c.play()
                         },
                         onLongClick = {
                             contextFile = cached.toAudioFile()
