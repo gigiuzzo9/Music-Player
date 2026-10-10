@@ -8,82 +8,27 @@ import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface PlaylistDao {
+interface CachedFileDao {
 
-    // --- Playlist ---
+    @Query("SELECT * FROM cached_files ORDER BY title ASC")
+    fun observeAll(): Flow<List<CachedFile>>
 
-    @Query("SELECT * FROM playlists ORDER BY id ASC")
-    fun observePlaylists(): Flow<List<Playlist>>
+    @Query("SELECT * FROM cached_files ORDER BY title ASC")
+    suspend fun getAll(): List<CachedFile>
 
-    @Insert
-    suspend fun insertPlaylist(playlist: Playlist): Long
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(files: List<CachedFile>)
 
-    @Query("DELETE FROM playlists WHERE id = :playlistId")
-    suspend fun deletePlaylist(playlistId: Long)
-
-    @Query("UPDATE playlists SET name = :newName WHERE id = :playlistId")
-    suspend fun renamePlaylist(playlistId: Long, newName: String)
-
-    // --- Brani di una playlist ---
-
-    @Query("SELECT * FROM playlist_songs WHERE playlistId = :playlistId ORDER BY position ASC")
-    fun observeSongs(playlistId: Long): Flow<List<PlaylistSong>>
-
-    @Query("SELECT * FROM playlist_songs WHERE playlistId = :playlistId ORDER BY position ASC")
-    suspend fun getSongs(playlistId: Long): List<PlaylistSong>
-
-    @Insert
-    suspend fun insertSongs(songs: List<PlaylistSong>)
-
-    @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId AND mediaId = :mediaId")
-    suspend fun removeSong(playlistId: Long, mediaId: Long)
-
-    @Query("SELECT COUNT(*) FROM playlist_songs WHERE playlistId = :playlistId")
-    suspend fun countSongs(playlistId: Long): Int
-
-    @Query("UPDATE playlist_songs SET position = :position WHERE id = :songId")
-    suspend fun updateSongPosition(songId: Long, position: Int)
-
-    // --- File nascosti ---
-
-    @Query("SELECT mediaId FROM hidden_files")
-    fun observeHiddenIds(): Flow<List<Long>>
-
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun hideFile(file: HiddenFile)
-
-    @Query("DELETE FROM hidden_files WHERE mediaId = :mediaId")
-    suspend fun unhideFile(mediaId: Long)
-
-    // --- Operazioni composte ---
-
-    @Transaction
-    suspend fun createPlaylistWithSongs(name: String, songs: List<PlaylistSong>) {
-        val playlistId = insertPlaylist(Playlist(name = name))
-        val fixed = songs.mapIndexed { index, song ->
-            song.copy(playlistId = playlistId, position = index)
-        }
-        insertSongs(fixed)
-    }
-
-    @Transaction
-    suspend fun addSongsToPlaylist(playlistId: Long, songs: List<PlaylistSong>) {
-        val startPos = countSongs(playlistId)
-        val fixed = songs.mapIndexed { index, song ->
-            song.copy(playlistId = playlistId, position = startPos + index)
-        }
-        insertSongs(fixed)
-    }
+    @Query("DELETE FROM cached_files")
+    suspend fun clearAll()
 
     /**
-     * Salva il nuovo ordine dei brani.
-     * Riceve la lista degli id dei brani nell'ordine desiderato
-     * e aggiorna la posizione di ciascuno.
+     * Sostituisce l'intera cache con la lista aggiornata.
+     * Cancella tutto e reinserisce: semplice e affidabile.
      */
     @Transaction
-    suspend fun reorderSongs(playlistId: Long, orderedSongIds: List<Long>) {
-        orderedSongIds.forEachIndexed { index, songId ->
-            updateSongPosition(songId, index)
-        }
+    suspend fun replaceAll(files: List<CachedFile>) {
+        clearAll()
+        insertAll(files)
     }
 }
