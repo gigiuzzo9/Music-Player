@@ -1,9 +1,16 @@
 package com.example.simpleplayer
 
 import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.simpleplayer.ui.PlayerScreen
@@ -46,6 +52,22 @@ class MainActivity : ComponentActivity() {
 fun PlayerApp() {
     val context = LocalContext.current
     var controller by remember { mutableStateOf<MediaController?>(null) }
+
+    // Chiedi il permesso MANAGE_EXTERNAL_STORAGE all'avvio
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                    intent.data = Uri.parse("package:${context.packageName}")
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    context.startActivity(intent)
+                }
+            }
+        }
+    }
 
     // Connessione al PlaybackService tramite MediaController
     DisposableEffect(Unit) {
