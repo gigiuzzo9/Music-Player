@@ -50,58 +50,62 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerBar(controller: MediaController) {
+fun PlayerBar(controller: MediaController?) {
 
-    var isPlaying by remember { mutableStateOf(controller.isPlaying) }
+    var isPlaying by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
     var artist by remember { mutableStateOf("") }
     var duration by remember { mutableLongStateOf(0L) }
     var position by remember { mutableLongStateOf(0L) }
     var isUserDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableFloatStateOf(0f) }
-    var repeatMode by remember { mutableIntStateOf(controller.repeatMode) }
+    var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
 
-    // Ascolta il player
+    // Ascolta il controller (quando arriva)
     DisposableEffect(controller) {
-        val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
+        if (controller == null) {
+            onDispose { }
+        } else {
+            val listener = object : Player.Listener {
+                override fun onIsPlayingChanged(playing: Boolean) {
+                    isPlaying = playing
+                }
 
-            override fun onRepeatModeChanged(mode: Int) {
-                repeatMode = mode
-            }
+                override fun onRepeatModeChanged(mode: Int) {
+                    repeatMode = mode
+                }
 
-            override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                title = metadata.title?.toString() ?: ""
-                artist = metadata.artist?.toString() ?: ""
-            }
+                override fun onMediaMetadataChanged(metadata: MediaMetadata) {
+                    title = metadata.title?.toString() ?: ""
+                    artist = metadata.artist?.toString() ?: ""
+                }
 
-            override fun onMediaItemTransition(
-                mediaItem: androidx.media3.common.MediaItem?,
-                reason: Int
-            ) {
-                val md = mediaItem?.mediaMetadata
-                title = md?.title?.toString() ?: ""
-                artist = md?.artist?.toString() ?: ""
-                position = 0L
-                duration = controller.duration.coerceAtLeast(0L)
+                override fun onMediaItemTransition(
+                    mediaItem: androidx.media3.common.MediaItem?,
+                    reason: Int
+                ) {
+                    val md = mediaItem?.mediaMetadata
+                    title = md?.title?.toString() ?: ""
+                    artist = md?.artist?.toString() ?: ""
+                    position = 0L
+                    duration = controller.duration.coerceAtLeast(0L)
+                }
             }
+            controller.addListener(listener)
+
+            val md = controller.currentMediaItem?.mediaMetadata
+            title = md?.title?.toString() ?: ""
+            artist = md?.artist?.toString() ?: ""
+            duration = controller.duration.coerceAtLeast(0L)
+            repeatMode = controller.repeatMode
+
+            onDispose { controller.removeListener(listener) }
         }
-        controller.addListener(listener)
-
-        // Imposta i valori iniziali
-        val md = controller.currentMediaItem?.mediaMetadata
-        title = md?.title?.toString() ?: ""
-        artist = md?.artist?.toString() ?: ""
-        duration = controller.duration.coerceAtLeast(0L)
-        repeatMode = controller.repeatMode
-
-        onDispose { controller.removeListener(listener) }
     }
 
-    // Aggiorna posizione e durata ogni 500 ms
+    // Aggiorna posizione e durata ogni 500 ms (solo se controller non è null)
     LaunchedEffect(controller) {
+        if (controller == null) return@LaunchedEffect
         while (true) {
             if (!isUserDragging) {
                 position = controller.currentPosition.coerceAtLeast(0L)
@@ -124,7 +128,7 @@ fun PlayerBar(controller: MediaController) {
     ) {
 
         Text(
-            title,
+            title.ifBlank { "Nessun brano" },
             style = MaterialTheme.typography.titleLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -136,7 +140,6 @@ fun PlayerBar(controller: MediaController) {
             overflow = TextOverflow.Ellipsis
         )
 
-        // --- Seekbar + tempi + pulsanti -10s / +10s ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -145,9 +148,10 @@ fun PlayerBar(controller: MediaController) {
         ) {
             IconButton(
                 onClick = {
-                    val newPos = (controller.currentPosition - 10_000L)
-                        .coerceIn(0L, controller.duration.coerceAtLeast(0L))
-                    controller.seekTo(newPos)
+                    val c = controller ?: return@IconButton
+                    val newPos = (c.currentPosition - 10_000L)
+                        .coerceIn(0L, c.duration.coerceAtLeast(0L))
+                    c.seekTo(newPos)
                 },
                 modifier = Modifier.size(40.dp)
             ) {
@@ -170,7 +174,7 @@ fun PlayerBar(controller: MediaController) {
                     dragPosition = it
                 },
                 onValueChangeFinished = {
-                    controller.seekTo(dragPosition.toLong())
+                    controller?.seekTo(dragPosition.toLong())
                     position = dragPosition.toLong()
                     isUserDragging = false
                 },
@@ -206,9 +210,10 @@ fun PlayerBar(controller: MediaController) {
 
             IconButton(
                 onClick = {
-                    val newPos = (controller.currentPosition + 10_000L)
-                        .coerceIn(0L, controller.duration.coerceAtLeast(0L))
-                    controller.seekTo(newPos)
+                    val c = controller ?: return@IconButton
+                    val newPos = (c.currentPosition + 10_000L)
+                        .coerceIn(0L, c.duration.coerceAtLeast(0L))
+                    c.seekTo(newPos)
                 },
                 modifier = Modifier.size(40.dp)
             ) {
@@ -220,7 +225,6 @@ fun PlayerBar(controller: MediaController) {
             }
         }
 
-        // --- Pulsanti ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -229,9 +233,8 @@ fun PlayerBar(controller: MediaController) {
 
             IconButton(
                 onClick = {
-                    if (controller.hasPreviousMediaItem()) {
-                        controller.seekToPreviousMediaItem()
-                    }
+                    val c = controller ?: return@IconButton
+                    if (c.hasPreviousMediaItem()) c.seekToPreviousMediaItem()
                 },
                 modifier = Modifier.size(56.dp)
             ) {
@@ -244,7 +247,8 @@ fun PlayerBar(controller: MediaController) {
 
             IconButton(
                 onClick = {
-                    if (controller.isPlaying) controller.pause() else controller.play()
+                    val c = controller ?: return@IconButton
+                    if (c.isPlaying) c.pause() else c.play()
                 },
                 modifier = Modifier.size(72.dp)
             ) {
@@ -257,9 +261,8 @@ fun PlayerBar(controller: MediaController) {
 
             IconButton(
                 onClick = {
-                    if (controller.hasNextMediaItem()) {
-                        controller.seekToNextMediaItem()
-                    }
+                    val c = controller ?: return@IconButton
+                    if (c.hasNextMediaItem()) c.seekToNextMediaItem()
                 },
                 modifier = Modifier.size(56.dp)
             ) {
@@ -272,12 +275,13 @@ fun PlayerBar(controller: MediaController) {
 
             IconButton(
                 onClick = {
-                    val next = when (controller.repeatMode) {
+                    val c = controller ?: return@IconButton
+                    val next = when (c.repeatMode) {
                         Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
                         Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
                         else -> Player.REPEAT_MODE_OFF
                     }
-                    controller.repeatMode = next
+                    c.repeatMode = next
                 },
                 modifier = Modifier.size(56.dp)
             ) {
