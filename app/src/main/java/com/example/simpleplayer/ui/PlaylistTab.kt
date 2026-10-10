@@ -55,10 +55,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
+import com.example.simpleplayer.data.CachedFile
 import com.example.simpleplayer.data.Playlist
 import com.example.simpleplayer.data.PlaylistSong
-import com.example.simpleplayer.model.AudioFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -68,17 +70,20 @@ fun PlaylistTab(controller: MediaController) {
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
     val dao = app.database.playlistDao()
+    val cachedDao = app.database.cachedFileDao()
     val scope = rememberCoroutineScope()
 
     val playlists by dao.observePlaylists().collectAsState(initial = emptyList())
     val hiddenIds by dao.observeHiddenIds().collectAsState(initial = emptyList())
+
+    // Cache dei file (istantanea)
+    val cachedFiles by cachedDao.observeAll().collectAsState(initial = emptyList())
 
     var showNameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var renamingPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
     var showFileDialog by remember { mutableStateOf(false) }
-    var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var addingToPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var mode by remember { mutableStateOf("") }
@@ -111,14 +116,19 @@ fun PlaylistTab(controller: MediaController) {
     ) { granted ->
         hasPermission = granted
         if (granted && mode.isNotEmpty()) {
-            allFiles = queryAudioFiles(context)
             showFileDialog = true
         }
     }
 
-    LaunchedEffect(showFileDialog) {
-        if (showFileDialog && hasPermission) {
-            allFiles = queryAudioFiles(context)
+    // Aggiornamento cache in background (silenzioso)
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val fresh = queryAudioFiles(context)
+                    cachedDao.replaceAll(fresh)
+                } catch (_: Exception) { }
+            }
         }
     }
 
@@ -204,7 +214,6 @@ fun PlaylistTab(controller: MediaController) {
                         addingToPlaylist = playlist
                         mode = "add"
                         if (hasPermission) {
-                            allFiles = queryAudioFiles(context)
                             showFileDialog = true
                         } else {
                             permissionLauncher.launch(
@@ -444,7 +453,6 @@ fun PlaylistTab(controller: MediaController) {
                             addingToPlaylist = null
                             mode = "create"
                             if (hasPermission) {
-                                allFiles = queryAudioFiles(context)
                                 showFileDialog = true
                             } else {
                                 permissionLauncher.launch(
@@ -464,9 +472,9 @@ fun PlaylistTab(controller: MediaController) {
         )
     }
 
-    // ---------- Popup selezione file ----------
+    // ---------- Popup selezione file (dalla cache) ----------
     if (showFileDialog) {
-        val visibleFiles = allFiles.filter { it.id !in hiddenIds }
+        val visibleFiles = cachedFiles.filter { it.mediaId !in hiddenIds }
 
         AlertDialog(
             onDismissRequest = {
@@ -507,11 +515,11 @@ fun PlaylistTab(controller: MediaController) {
                                     )
                                 }
                                 Checkbox(
-                                    checked = file.id in selectedIds,
+                                    checked = file.mediaId in selectedIds,
                                     onCheckedChange = { checked ->
                                         selectedIds =
-                                            if (checked) selectedIds + file.id
-                                            else selectedIds - file.id
+                                            if (checked) selectedIds + file.mediaId
+                                            else selectedIds - file.mediaId
                                     }
                                 )
                             }
@@ -521,15 +529,15 @@ fun PlaylistTab(controller: MediaController) {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val chosen = allFiles
-                        .filter { it.id in selectedIds }
+                    val chosen = cachedFiles
+                        .filter { it.mediaId in selectedIds }
                         .map { f ->
                             PlaylistSong(
                                 playlistId = 0,
-                                mediaId = f.id,
+                                mediaId = f.mediaId,
                                 title = f.title,
                                 artist = f.artist,
-                                uri = f.uri.toString(),
+                                uri = f.uri,
                                 path = null,
                                 position = 0
                             )
@@ -562,8 +570,8 @@ fun PlaylistTab(controller: MediaController) {
     }
 }
 
-private fun queryAudioFiles(context: Context): List<AudioFile> {
-    val list = mutableListOf<AudioFile>()
+private suspend fun queryAudioFiles(context: Context): List<CachedFile> {
+    val list = mutableListOf<CachedFile>()
     val projection = arrayOf(
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
@@ -592,13 +600,12 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
             list.add(
-                AudioFile(
-                    id = id,
+                CachedFile(
+                    mediaId = id,
                     title = it.getString(titleCol) ?: "Sconosciuto",
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
-                    uri = uri,
-                    path = null
+                    uri = uri.toString()
                 )
             )
         }
