@@ -6,13 +6,19 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Playlist::class, PlaylistSong::class, HiddenFile::class],
-    version = 3,
+    entities = [
+        Playlist::class,
+        PlaylistSong::class,
+        HiddenFile::class,
+        CachedFile::class
+    ],
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun playlistDao(): PlaylistDao
+    abstract fun cachedFileDao(): CachedFileDao
 
     companion object {
         @Volatile
