@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.simpleplayer.ui.PlayerScreen
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Forza l'app a stare DENTRO le barre di sistema (non sotto)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         setContent {
             SimplePlayerTheme {
@@ -51,7 +55,6 @@ fun PlayerApp() {
     val context = LocalContext.current
     var controller by remember { mutableStateOf<MediaController?>(null) }
 
-    // Chiedi il permesso MANAGE_EXTERNAL_STORAGE all'avvio
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -67,7 +70,6 @@ fun PlayerApp() {
         }
     }
 
-    // Connessione al PlaybackService tramite MediaController (in background)
     DisposableEffect(Unit) {
         val token = SessionToken(
             context,
@@ -88,6 +90,5 @@ fun PlayerApp() {
         }
     }
 
-    // La UI si mostra SEMPRE, anche se il controller non è pronto
     PlayerScreen(controller = controller)
 }
