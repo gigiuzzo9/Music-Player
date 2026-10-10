@@ -2,7 +2,6 @@ package com.example.simpleplayer.ui
 
 import android.Manifest
 import android.content.ContentUris
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
@@ -33,17 +32,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.simpleplayer.SimplePlayerApp
-import com.example.simpleplayer.model.AudioFile
+import com.example.simpleplayer.data.CachedFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun HiddenTab() {
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
     val dao = app.database.playlistDao()
+    val cachedDao = app.database.cachedFileDao()
     val scope = rememberCoroutineScope()
 
-    var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
+    // Cache (istantanea)
+    val cachedFiles by cachedDao.observeAll().collectAsState(initial = emptyList())
     val hiddenIds by dao.observeHiddenIds().collectAsState(initial = emptyList())
 
     var hasPermission by remember {
@@ -73,9 +76,15 @@ fun HiddenTab() {
         }
     }
 
+    // Aggiornamento cache in background (silenzioso)
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            allFiles = queryAudioFiles(context)
+            withContext(Dispatchers.IO) {
+                try {
+                    val fresh = queryAudioFiles(context)
+                    cachedDao.replaceAll(fresh)
+                } catch (_: Exception) { }
+            }
         }
     }
 
@@ -87,7 +96,7 @@ fun HiddenTab() {
         return
     }
 
-    val hiddenFiles = allFiles.filter { it.id in hiddenIds }
+    val hiddenFiles = cachedFiles.filter { it.mediaId in hiddenIds }
 
     if (hiddenFiles.isEmpty()) {
         Text(
@@ -98,7 +107,7 @@ fun HiddenTab() {
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(hiddenFiles, key = { it.id }) { file ->
+        items(hiddenFiles, key = { it.mediaId }) { file ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -113,7 +122,7 @@ fun HiddenTab() {
                     )
                 }
                 TextButton(onClick = {
-                    scope.launch { dao.unhideFile(file.id) }
+                    scope.launch { dao.unhideFile(file.mediaId) }
                 }) {
                     Text("Ripristina")
                 }
@@ -130,8 +139,8 @@ private fun formatTime(ms: Long): String {
     return "%d:%02d".format(min, sec)
 }
 
-private fun queryAudioFiles(context: Context): List<AudioFile> {
-    val list = mutableListOf<AudioFile>()
+private suspend fun queryAudioFiles(context: android.content.Context): List<CachedFile> {
+    val list = mutableListOf<CachedFile>()
     val projection = arrayOf(
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
@@ -160,13 +169,12 @@ private fun queryAudioFiles(context: Context): List<AudioFile> {
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
             list.add(
-                AudioFile(
-                    id = id,
+                CachedFile(
+                    mediaId = id,
                     title = it.getString(titleCol) ?: "Sconosciuto",
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
-                    uri = uri,
-                    path = null
+                    uri = uri.toString()
                 )
             )
         }
