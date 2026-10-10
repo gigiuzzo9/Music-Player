@@ -1,10 +1,11 @@
 package com.example.simpleplayer.ui
 
 import android.Manifest
-import android.content.ContentUris
 import android.content.pm.PackageManager
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
+import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -38,7 +39,10 @@ import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
 import com.example.simpleplayer.data.HiddenFile
 import com.example.simpleplayer.model.AudioFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -80,18 +84,11 @@ fun FilesTab(controller: MediaController) {
         }
     }
 
-    LaunchedEffect(hasPermission) {
-        if (hasPermission) {
-            allFiles = queryAudioFiles(context)
+    // Carica i file in background (non blocca la UI)
+    LaunchedEffect(Unit) {
+        allFiles = withContext(Dispatchers.IO) {
+            scanAudioFiles()
         }
-    }
-
-    if (!hasPermission) {
-        Text(
-            "Serve il permesso per leggere i file audio",
-            modifier = Modifier.padding(16.dp)
-        )
-        return
     }
 
     val hidden = hiddenIds ?: return
@@ -107,8 +104,8 @@ fun FilesTab(controller: MediaController) {
                         onClick = {
                             val items = visibleFiles.map { f ->
                                 MediaItem.Builder()
-                                    .setUri(f.uri)
-                                    .setMediaId(f.id.toString())
+                                    .setUri(Uri.fromFile(File(f.path!!)))
+                                    .setMediaId(f.path)
                                     .setMediaMetadata(
                                         MediaMetadata.Builder()
                                             .setTitle(f.title)
@@ -165,46 +162,54 @@ private fun formatTime(ms: Long): String {
     return "%d:%02d".format(min, sec)
 }
 
-private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
+/**
+ * Scansiona direttamente il file system (come il file manager).
+ * Nessuna query a MediaStore: è istantaneo.
+ */
+private fun scanAudioFiles(): List<AudioFile> {
     val list = mutableListOf<AudioFile>()
-    val projection = arrayOf(
-        MediaStore.Audio.Media._ID,
-        MediaStore.Audio.Media.TITLE,
-        MediaStore.Audio.Media.ARTIST,
-        MediaStore.Audio.Media.DURATION
-    )
-    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 " +
-            "AND ${MediaStore.Audio.Media.DURATION} >= 5000"
-    val cursor = context.contentResolver.query(
-        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-        projection,
-        selection,
-        null,
-        "${MediaStore.Audio.Media.TITLE} ASC"
-    )
+    val extensions = listOf("mp3", "m4a", "aac", "flac", "ogg", "wav", "opus", "wma")
 
-    cursor?.use {
-        val idCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-        val titleCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-        val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-        val durCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+    val root = Environment.getExternalStorageDirectory()
 
-        while (it.moveToNext()) {
-            val id = it.getLong(idCol)
-            val uri = ContentUris.withAppendedId(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
-            )
-            list.add(
-                AudioFile(
-                    id = id,
-                    title = it.getString(titleCol) ?: "Sconosciuto",
-                    artist = it.getString(artistCol) ?: "Sconosciuto",
-                    durationMs = it.getLong(durCol),
-                    uri = uri,
-                    path = null
-                )
-            )
+    // Scansiona tutte le cartelle ricorsivamente
+    root.walkTopDown()
+        .filter { it.isFile }
+        .filter { file ->
+            extensions.any { ext -> file.name.lowercase().endsWith(".$ext") }
         }
-    }
-    return list
+        .forEach { file ->
+            try {
+                val retriever = MediaMetadataRetriever()
+                retriever.setDataSource(file.absolutePath)
+
+                val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    ?: file.nameWithoutExtension
+                val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    ?: "Sconosciuto"
+                val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val duration = durationStr?.toLongOrNull() ?: 0L
+
+                retriever.release()
+
+                // Filtro 5 secondi
+                if (duration >= 5000) {
+                    list.add(
+                        AudioFile(
+                            id = file.absolutePath.hashCode().toLong(),
+                            title = title,
+                            artist = artist,
+                            durationMs = duration,
+                            uri = Uri.fromFile(file),
+                            path = file.absolutePath
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                // Ignora file non leggibili
+            }
+        }
+
+    // Ordina per titolo
+    return list.sortedBy { it.title.lowercase() }
 }
