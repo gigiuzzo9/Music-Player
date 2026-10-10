@@ -65,7 +65,7 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
-fun PlaylistTab(controller: MediaController) {
+fun PlaylistTab(controller: MediaController?) {
 
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
@@ -75,8 +75,6 @@ fun PlaylistTab(controller: MediaController) {
 
     val playlists by dao.observePlaylists().collectAsState(initial = emptyList())
     val hiddenIds by dao.observeHiddenIds().collectAsState(initial = emptyList())
-
-    // Cache dei file (istantanea)
     val cachedFiles by cachedDao.observeAll().collectAsState(initial = emptyList())
 
     var showNameDialog by remember { mutableStateOf(false) }
@@ -120,7 +118,6 @@ fun PlaylistTab(controller: MediaController) {
         }
     }
 
-    // Aggiornamento cache in background (silenzioso)
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             withContext(Dispatchers.IO) {
@@ -186,6 +183,7 @@ fun PlaylistTab(controller: MediaController) {
                 Column {
                     TextButton(onClick = {
                         actionsPlaylist = null
+                        val c = controller ?: return@TextButton
                         scope.launch {
                             val songs = dao.getSongs(playlist.id)
                             if (songs.isNotEmpty()) {
@@ -201,9 +199,9 @@ fun PlaylistTab(controller: MediaController) {
                                         )
                                         .build()
                                 }
-                                controller.setMediaItems(items, 0, 0L)
-                                controller.prepare()
-                                controller.play()
+                                c.setMediaItems(items, 0, 0L)
+                                c.prepare()
+                                c.play()
                             }
                         }
                     }) { Text("Riproduci") }
@@ -377,6 +375,7 @@ fun PlaylistTab(controller: MediaController) {
                                             .weight(1f)
                                             .clickable {
                                                 if (!deletingMode) {
+                                                    val c = controller ?: return@clickable
                                                     val index = openedSongs.indexOf(song)
                                                     val items = openedSongs.map { s ->
                                                         MediaItem.Builder()
@@ -390,9 +389,9 @@ fun PlaylistTab(controller: MediaController) {
                                                             )
                                                             .build()
                                                     }
-                                                    controller.setMediaItems(items, index, 0L)
-                                                    controller.prepare()
-                                                    controller.play()
+                                                    c.setMediaItems(items, index, 0L)
+                                                    c.prepare()
+                                                    c.play()
                                                 }
                                             }
                                     ) {
@@ -472,7 +471,7 @@ fun PlaylistTab(controller: MediaController) {
         )
     }
 
-    // ---------- Popup selezione file (dalla cache) ----------
+    // ---------- Popup selezione file ----------
     if (showFileDialog) {
         val visibleFiles = cachedFiles.filter { it.mediaId !in hiddenIds }
 
