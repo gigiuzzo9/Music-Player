@@ -2,5 +2,8 @@
 <resources>
     <style name="Theme.SimplePlayer" parent="android:Theme.DeviceDefault.Light.NoActionBar">
         <item name="android:windowBackground">@android:color/background_light</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
