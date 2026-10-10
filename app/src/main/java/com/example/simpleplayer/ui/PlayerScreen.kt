@@ -32,7 +32,7 @@ import androidx.media3.session.MediaController
 import kotlinx.coroutines.launch
 
 @Composable
-fun PlayerScreen(controller: MediaController) {
+fun PlayerScreen(controller: MediaController?) {
 
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
@@ -96,16 +96,12 @@ fun PlayerScreen(controller: MediaController) {
             }
         }
 
-        // Contenitore player: sfondo grigio che riempie tutto,
-        // ma il contenuto è alzato SOPRA la barra nera di Android
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.35f)
                 .background(headerBackground)
         ) {
-            // padding inferiore = altezza barra Android
-            // così il contenuto non finisce sotto i pulsanti
             Column(
                 modifier = Modifier
                     .fillMaxSize()
