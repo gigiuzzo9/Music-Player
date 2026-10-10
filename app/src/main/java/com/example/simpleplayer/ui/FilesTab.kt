@@ -36,9 +36,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import com.example.simpleplayer.SimplePlayerApp
+import com.example.simpleplayer.data.CachedFile
 import com.example.simpleplayer.data.HiddenFile
 import com.example.simpleplayer.model.AudioFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -46,9 +49,13 @@ fun FilesTab(controller: MediaController) {
     val context = LocalContext.current
     val app = context.applicationContext as SimplePlayerApp
     val dao = app.database.playlistDao()
+    val cachedDao = app.database.cachedFileDao()
     val scope = rememberCoroutineScope()
 
-    var allFiles by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
+    // Lista dalla cache (istantanea)
+    val cachedFiles by cachedDao.observeAll().collectAsState(initial = emptyList())
+
+    // Nascosti
     val hiddenIds by dao.observeHiddenIds().collectAsState(initial = null)
 
     var hasPermission by remember {
@@ -80,9 +87,15 @@ fun FilesTab(controller: MediaController) {
         }
     }
 
+    // Aggiornamento in background: silenzioso, senza popup
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            allFiles = queryAudioFiles(context)
+            withContext(Dispatchers.IO) {
+                try {
+                    val fresh = queryAudioFiles(context)
+                    cachedDao.replaceAll(fresh)
+                } catch (_: Exception) { }
+            }
         }
     }
 
@@ -96,10 +109,10 @@ fun FilesTab(controller: MediaController) {
 
     val hidden = hiddenIds ?: return
 
-    val visibleFiles = allFiles.filter { it.id !in hidden }
+    val visibleFiles = cachedFiles.filter { it.mediaId !in hidden }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(visibleFiles, key = { it.id }) { file ->
+        items(visibleFiles, key = { it.mediaId }) { cached ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -108,7 +121,7 @@ fun FilesTab(controller: MediaController) {
                             val items = visibleFiles.map { f ->
                                 MediaItem.Builder()
                                     .setUri(f.uri)
-                                    .setMediaId(f.id.toString())
+                                    .setMediaId(f.mediaId.toString())
                                     .setMediaMetadata(
                                         MediaMetadata.Builder()
                                             .setTitle(f.title)
@@ -117,20 +130,20 @@ fun FilesTab(controller: MediaController) {
                                     )
                                     .build()
                             }
-                            val index = visibleFiles.indexOf(file).coerceAtLeast(0)
+                            val index = visibleFiles.indexOf(cached).coerceAtLeast(0)
                             controller.setMediaItems(items, index, 0L)
                             controller.prepare()
                             controller.play()
                         },
                         onLongClick = {
-                            contextFile = file
+                            contextFile = cached.toAudioFile()
                         }
                     )
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Text(file.title)
+                Text(cached.title)
                 Text(
-                    "${file.artist} · ${formatTime(file.durationMs)}",
+                    "${cached.artist} · ${formatTime(cached.durationMs)}",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -158,6 +171,17 @@ fun FilesTab(controller: MediaController) {
     }
 }
 
+private fun CachedFile.toAudioFile(): AudioFile {
+    return AudioFile(
+        id = mediaId,
+        title = title,
+        artist = artist,
+        durationMs = durationMs,
+        uri = android.net.Uri.parse(uri),
+        path = null
+    )
+}
+
 private fun formatTime(ms: Long): String {
     val totalSec = (ms / 1000).coerceAtLeast(0)
     val min = totalSec / 60
@@ -165,8 +189,8 @@ private fun formatTime(ms: Long): String {
     return "%d:%02d".format(min, sec)
 }
 
-private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
-    val list = mutableListOf<AudioFile>()
+private suspend fun queryAudioFiles(context: android.content.Context): List<CachedFile> {
+    val list = mutableListOf<CachedFile>()
     val projection = arrayOf(
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.TITLE,
@@ -195,13 +219,12 @@ private fun queryAudioFiles(context: android.content.Context): List<AudioFile> {
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
             )
             list.add(
-                AudioFile(
-                    id = id,
+                CachedFile(
+                    mediaId = id,
                     title = it.getString(titleCol) ?: "Sconosciuto",
                     artist = it.getString(artistCol) ?: "Sconosciuto",
                     durationMs = it.getLong(durCol),
-                    uri = uri,
-                    path = null
+                    uri = uri.toString()
                 )
             )
         }
