@@ -1,16 +1,14 @@
 package com.example.simpleplayer
 
 import android.content.ComponentName
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.content.Intent
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -69,7 +67,7 @@ fun PlayerApp() {
         }
     }
 
-    // Connessione al PlaybackService tramite MediaController
+    // Connessione al PlaybackService tramite MediaController (in background)
     DisposableEffect(Unit) {
         val token = SessionToken(
             context,
@@ -90,10 +88,6 @@ fun PlayerApp() {
         }
     }
 
-    val c = controller
-    if (c == null) {
-        return
-    }
-
-    PlayerScreen(controller = c)
+    // La UI si mostra SEMPRE, anche se il controller non è pronto
+    PlayerScreen(controller = controller)
 }
